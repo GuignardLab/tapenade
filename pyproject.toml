@@ -25,12 +25,6 @@ push = false
 "src/organoid/__init__.py" = [
     '__version__ = "{version}"',
 ]
-"src/organoid/reconstruction/__init__.py" = [
-    '__version__ = "{version}"',
-]
-"src/organoid/preprocessing/__init__.py" = [
-    '__version__ = "{version}"',
-]
 "setup.cfg" = [
     "version = {version}"
 ]

@@ -1,4 +1,4 @@
-from organoid.reconstrucion import reconstruct_foo
+from organoid.reconstruction import reconstruct_foo
 
 
 def test_foo():
