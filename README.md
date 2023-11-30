@@ -13,7 +13,7 @@ This repository has been developed by (in alphabetical order):
 - [Alice Gros]
 - [Jules Vanaret]
 - [Léo Guignard](mailto:leo.guignard@amu-univ.fr)
-- [Valentin Dunsting-Eichenauer]
+- [Valentin Dunsing-Eichenauer]
 
 ----------------------------------
 
