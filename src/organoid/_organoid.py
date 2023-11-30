@@ -8,3 +8,7 @@ class Organoid:
 
     def __init__(self, arg):
         self.arg = arg
+
+
+def test_organoid():
+    print("hello")
