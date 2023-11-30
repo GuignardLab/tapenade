@@ -11,8 +11,8 @@ A repository to process organoid images.
 This repository has been developed by (in alphabetical order):
 
 - [Alice Gros]
-- [Léo Guignard](mailto:leo.guignard@amu-univ.fr)
 - [Jules Vanaret]
+- [Léo Guignard](mailto:leo.guignard@amu-univ.fr)
 - [Valentin Dunsting-Eichenauer]
 
 ----------------------------------
