@@ -17,7 +17,7 @@ This repository has been developed by (in alphabetical order):
 
 ----------------------------------
 
-## Installation modifications
+## Installation other modifications
 
 You can install `organoid` via [pip]:
 
