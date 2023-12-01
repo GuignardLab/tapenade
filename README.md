@@ -22,13 +22,13 @@ This repository has been developed by (in alphabetical order):
 You can install `organoid` via [pip]:
 
 ```shell
-    pip install organoid
+pip install organoid
 ```
 
 To install latest development version :
 
 ```shell
-    pip install git+https://github.com/GuignardLab/organoid.git
+pip install git+https://github.com/GuignardLab/organoid.git
 ```
 
 ## Contributing
