@@ -10,10 +10,10 @@ A repository to process organoid images.
 
 This repository has been developed by (in alphabetical order):
 
-- [Alice Gros]
+- [Alice Gros](mailto:alice.gros@univ-amu.fr)
 - [Jules Vanaret](mailto:jules.vanaret@univ-amu.fr)
-- [Léo Guignard](mailto:leo.guignard@amu-univ.fr)
-- [Valentin Dunsing-Eichenauer]
+- [Léo Guignard](mailto:leo.guignard@univ-amu.fr)
+- [Valentin Dunsing-Eichenauer](valentin.dunsing@univ-amu.fr)
 
 ----------------------------------
 
