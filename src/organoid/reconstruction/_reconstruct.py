@@ -61,10 +61,10 @@ def plot_positions(path_bottom_positions:str,path_top_positions:str) :
         ax.annotate(txt, (xpos_b[i], ypos_b[i]))
 
     list_number_t= [i+1 for i in range(len(xpos_t))]
-    ax.scatter(xpos_t, -ypos_t,label='top')
+    ax.scatter(xpos_t, ypos_t,label='top')
 
     for i, txt in enumerate(list_number_t):
-        ax.annotate(txt, (xpos_t[i],-ypos_t[i]))
+        ax.annotate(txt, (xpos_t[i],ypos_t[i]))
 
     plt.legend()
 
@@ -87,7 +87,7 @@ def associate_top_bottom(path_bottom_positions:str,path_top_positions:str):
 
     (xpos_b,ypos_b)=extract_positions(path_bottom_positions)
     (xpos_t,ypos_t)=extract_positions(path_top_positions)  
-
+    ypos_t=-ypos_t # inverse the flipping operation
     cost=np.zeros((len(xpos_b),len(xpos_t)))
     for i in range(len(xpos_b)):
         for j in range(len(xpos_t)):
@@ -213,9 +213,9 @@ def register(path_data:str, path_to_bin:str, sample_id:str, channel:str, input_v
     # sample_id : str
     # channel : str
     #     channel to register : only one here
-    # input_voxel : tuple, optional
+    # input_voxel : tuple, optional (XYZ)
     #     voxel size of the input image, by default [1,1,1]
-    # output_voxel : tuple, optional
+    # output_voxel : tuple, optional (XYZ)
     #     voxel size of the output image, by default [1,1,1]. Can be different than the input voxel size.
     # compute_trsf : int, optional
     #     1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as teh reference, register this channel using compute_trsf=1.
