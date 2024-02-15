@@ -1,7 +1,6 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-
 from xml.dom import minidom
 from scipy.optimize import linear_sum_assignment
 import numpy as np
@@ -14,8 +13,10 @@ from scipy.spatial.transform import Rotation
 import registrationtools
 import tifffile
 from xml.dom import minidom
-from scipy.optimize import linear_sum_assignment
 import napari
+
+#Remains to be done/solved :
+#should we keep the names 'bottom' and 'top' ? or should we use 'reference' and 'floating' ? view1 and view 2 ?
 
 def extract_positions(path_positions:str):
     """
@@ -139,14 +140,15 @@ def create_folders(folder_experiment:str,
         num_bottom = list_bottom[ind_g]
         num_top = list_top[ind_g]
         image_bottom = tifffile.imread(rf'{folder_experiment}/{num_bottom}_bottom.tif')
-        image_flip = tifffile.imread(rf'{folder_experiment}/{num_top}_top.tif')
+        image_top = tifffile.imread(rf'{folder_experiment}/{num_top}_top.tif')
         for ind_ch,ch in enumerate(channels) :
             tifffile.imwrite(folder_sample+rf"/raw/{name}_bot_{ch}.tif",image_bottom[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
-            tifffile.imwrite(folder_sample+rf"/raw/{name}_top_{ch}.tif",image_flip[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
+            tifffile.imwrite(folder_sample+rf"/raw/{name}_top_{ch}.tif",image_top[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
 
 
 
-def manual_registration_fct(label_bottom, label_top) :
+def manual_registration_fct(reference_landmarks, floating_landmarks):
+#stolen from https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py
     """
     Finds the transformation between 2 sets of points in 3D.
     If the automatic registration can't find an accurate transformation :
@@ -156,63 +158,101 @@ def manual_registration_fct(label_bottom, label_top) :
 
     Parameters
     ----------
-    label_bottom : np.array
-        label of the bottom image
-    label_top : np.array
-        label of the top image
+    reference_landmarks : np.array
+        This image will be the reference, the 'fixed' one
+    floating_landmarks : np.array
+        This image will be the floating image, the one that will be registered onto the reference image
     
     Returns
     -------
     translation and rotation to apply to the top image to register it on the bottom image
-    In the following order : translation_x, translation_y, translation_z, rotation_x, rotation_y, rotation_z.
+    In the following order : rotation_z, rotation_y, rotation_x, translation_z, translation_y, translation_x.
     """
 
-    rg_bottom=regionprops(label_bottom)
-    centroids_bottom=np.array([prop.centroid for prop in rg_bottom]).T
-    rg_trop=regionprops(label_top)
-    centroids_top=np.array([prop.centroid for prop in rg_trop]).T
-
-    centermass_bottom = np.mean(centroids_bottom,axis=1).reshape(3,1)
-    centermass_top = np.mean(centroids_top,axis=1).reshape(3,1)
-
-    centered_coords_bottom=centroids_bottom-centermass_bottom
-    centered_coords_top=centroids_top-centermass_top
+    rg_ref=regionprops(reference_landmarks)
+    centroids_ref=np.array([prop.centroid for prop in rg_ref]).T
+    rg_float=regionprops(floating_landmarks)
+    centroids_float=np.array([prop.centroid for prop in rg_float]).T
 
 
-    C = centered_coords_bottom @ centered_coords_top.T
-    U,S,Vt = np.linalg.svd(C)
+    assert centroids_ref.shape == centroids_float.shape
 
-    Rot = U @ Vt
+    num_rows, num_cols = centroids_ref.shape
+    if num_rows != 3:
+        raise Exception(f"matrix centroids_ref is not 3xN, it is {num_rows}x{num_cols}")
 
-    translation = centermass_bottom-centermass_top
-    # Convert the rotation matrix to a Rotation object
-    rotation = Rotation.from_matrix(Rot)
-    # quaternion = (rotation.as_quat())
-    # rot_x = quaternion
+    num_rows, num_cols = centroids_float.shape
+    if num_rows != 3:
+        raise Exception(f"matrix centroids_float is not 3xN, it is {num_rows}x{num_cols}")
 
+    # find mean column wise
+    centermass_ref = np.mean(centroids_ref, axis=1)
+    centermass_float = np.mean(centroids_float, axis=1)
+
+    # ensure centermasss are 3x1
+    centermass_ref = centermass_ref.reshape(-1, 1)
+    centermass_float = centermass_float.reshape(-1, 1)
+
+    # subtract mean
+    centroids_ref_centered = centroids_ref - centermass_ref
+    centroids_float_centered = centroids_float - centermass_float
+
+    H = centroids_ref_centered @ np.transpose(centroids_float_centered)
+
+    # find rotation
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+
+    # special reflection case
+    if np.linalg.det(R) < 0:
+        print("det(R) < R, reflection detected!, correcting for it ...")
+        Vt[2,:] *= -1
+        R = Vt.T @ U.T
+
+    t = R @ centermass_ref + centermass_float
+    rotation = Rotation.from_matrix(R)
     rotation_angles = rotation.as_euler('zyx', degrees=True)
-    # Extract individual rotation angles
     rotation_z, rotation_y, rotation_x = rotation_angles
+    trans_z,trans_y,trans_x=t
 
-    return(translation[2],translation[1],translation[0],int(rotation_x),int(rotation_y),int(rotation_z))
 
-def register(path_data:str, path_to_bin:str, sample_id:str, channel:str, input_voxel:tuple=[1,1,1],
-            output_voxel:tuple=[1,1,1],compute_trsf:int=1, init_trsfs=[["flip", "Y", "flip", "Z", "trans", "Z", -10,]],
-            trsf_type:str='rigid', depth:int=3, save_json:bool=False) :
-    
+    return (rotation_z,rotation_y,rotation_x,trans_z,trans_y,trans_x)
+
+
+def register(path_data:str,
+             path_transformation:str,
+             path_registered_data:str,
+             path_to_bin:str,
+             reference_image:str,
+             floating_image:str,
+             input_voxel:tuple=[1,1,1],
+             output_voxel:tuple=[1,1,1],
+             compute_trsf:int=1,
+             init_trsfs=[["flip", "Y", "flip", "Z", "trans", "Z", -10,]],
+             test_init:int=0,
+             trsf_type:str='rigid',
+             depth:int=3,
+             save_json:str='') :
+
+
+##this is under comments because if i put quotation marks, the importation fails (?)
     # Register the two sides of the sample, using the previously computed transformation (if any) or computing a new one
 
-    
+
     # Parameters
     # ----------
     # path_data : str
-    #     main path to the data folder (the registration will be saved in a subfolder)
+    #     path to the raw images
+    # path_transformation : str
+    #     path to the folder where the transformations files are saved
+    # path_registered_data : str
+    #     path where the registered images will be saved
     # path_to_bin : str
     #     path to the bin folder : necessary to save the registered data : should be something like 'C:\Users\user\Anaconda3\envs\my_environment\Library\bin'
-
-    # sample_id : str
-    # channel : str
-    #     channel to register : only one here
+    # reference_image : str
+    #     name of the reference image, the 'fixed' one
+    # floating_image : str
+    #     name of the floating image, the one that will be registered onto the reference image
     # input_voxel : tuple, optional
     #     voxel size of the input image, by default [1,1,1]
     # output_voxel : tuple, optional
@@ -227,48 +267,43 @@ def register(path_data:str, path_to_bin:str, sample_id:str, channel:str, input_v
     # trsf_type : str, optional
     #     type of transformation to compute : rigid, affine. By default rigid.
     # depth : int, optional
-    #     
+        
     # save_json : bool, optional
     #     if True, saves the parameters in a json file, in the main folder. By default False.
-    
-
-
 
 
     data = {
             "path_to_bin": path_to_bin, #necessary to register the data
-            "path_to_data": rf"{path_data}/{sample_id}/raw/",
-            "ref_im": rf"{sample_id}_bot_{channel}.tif",
-            "flo_ims": [rf"{sample_id}_top_{channel}.tif"
-            ],
-            "compute_trsf": compute_trsf
-            ,
+            "path_to_data": path_data,
+            "ref_im": reference_image, #rf"{sample_id}_bot_{channel}.tif",
+            "flo_ims": [floating_image], # [rf"{sample_id}_top_{channel}.tif"],
+            "compute_trsf": compute_trsf,
             "init_trsfs":init_trsfs,
-            "trsf_paths": [rf"{path_data}/{sample_id}/trsf/"],
+            "trsf_paths": [path_transformation],
             "trsf_types": [trsf_type],
             "ref_voxel": input_voxel,
             "flo_voxels": [ input_voxel],
             "out_voxel":output_voxel,
-            "test_init": 0,
+            "test_init": test_init,
             "apply_trsf": 1,
-            "out_pattern": rf"{path_data}/{sample_id}/registered",
+            "out_pattern": path_registered_data,
             "begin" : 1,
             "end":1,
             "bbox_out": 1,
             "registration_depth":depth,
         }
 
-    if save_json :
+    if save_json is not '':
         json_string=json.dumps(data)
-        with open(path_data+'\parameters.json','w') as outfile :
+        with open(save_json+'\parameters.json','w') as outfile :
             outfile.write(json_string)
 
     tr = registrationtools.SpatialRegistration(data)
     tr.run_trsf()
 
-def check_napari(folder_experiment:str,
-                 sample_id:str,
-                 channel,
+def check_napari(path_registered_data:str,
+                 reference_image:str,
+                 floating_image:str,
                  scale:tuple=(1,1,1)) :
     """
     Opens the registered images in napari , to check how they overlap
@@ -278,79 +313,84 @@ def check_napari(folder_experiment:str,
     folder_experiment : str
         path to the main folder
     sample_id : str
-    channel : str
-        name of the channel to look at
     scale : tuple, optional
         scale of the image (should be the same ), by default (1,1,1)
     """
 
 
     viewer=napari.Viewer()
-    reg_flip1 = tifffile.imread(rf'{folder_experiment}/{sample_id}/registered/{sample_id}_bot_{channel}.tif') 
-    reg_flip2 = tifffile.imread(rf'{folder_experiment}/{sample_id}/registered/{sample_id}_top_{channel}.tif')
-    viewer.add_image(reg_flip1,colormap='cyan',name=rf'{sample_id}_bot_{channel}',scale=scale)
-    viewer.add_image(reg_flip2,colormap='red',opacity=0.4,name=rf'{sample_id}_top_{channel}',scale=scale)
+    ref_im = tifffile.imread(rf'{path_registered_data}/{reference_image}') 
+    float_im = tifffile.imread(rf'{path_registered_data}/{floating_image}')
+    viewer.add_image(ref_im,colormap='cyan',name=rf'{reference_image}',scale=scale)
+    viewer.add_image(float_im,colormap='red',blending='additive',name=rf'{floating_image}',scale=scale)
     napari.run()
 
-def fuse_sides (folder_experiment:str,
-                sample_id,
-                channels:list,
-                mode:str='linear',
+
+def sigmoid(x,x0,p):
+    """
+    Sigmoid function, to weight the images by the distance to the edges
+    z0 gives the middle of the sigmoid, at which weight=0.5
+    p gives the slope. 5 corresponds to a low slope, wide fusion width and 25 to a strong slope, very thin fusion width.
+    """
+    # for z in range(len(z)) :
+    return (1 / (1 + np.exp(-p*(x-x0))))
+    
+def fuse_sides (path_registered_data:str,
+                reference_image_reg:str,
+                floating_image_reg:str,
                 folder_output:str='',
+                name_output:str='fusion',
+                slope_coeff:int=20,
                 axis:int=0):
     """
     Fuse the two sides of the sample, using the previously registered images
 
     Parameters
     ----------
-    folder_experiment : str
-        path to the main folder
-    channels : list
-        list of the names of the channels
-    sample_id : str
-    mode : str, optional
-        mode of fusion : linear or ?, by default 'linear'
-    folder_output : str, optional
-        path to the output folder, if None, will be the same as the experiment folder
+    path_registered_data : str
+        path to the registered images
+    reference_image_reg : str
+        name of the reference image, the 'fixed' one
+    floating_image_reg : str
+        name of the floating image, the one that will be registered onto the reference image
+    folder_output : str
+        path to the folder where the fused image will be saved
+    name_output : str, optional
+        name of the output which is the fused image , by default 'fusion'
     axis : int, optional
         axis along which the fusion is done, by default 0 (z axis)
     """
-
-
-    if folder_output=='' : #if user does not give a output path, then its saved in 'output' folder inside the 'sample' folder
-            os.mkdir(os.path.join(rf'{folder_experiment}\{sample_id}',"fused"))
-            folder_output=rf'{folder_experiment}\{sample_id}\fused'
         
-    for ch in channels :
-    ###Takes the previously saved images (two registered sides) to merge them
-        reg_flip1 = tifffile.imread(rf'{folder_experiment}/{sample_id}/registered/{sample_id}_bot_{ch}.tif')
-        reg_flip2 = tifffile.imread(rf'{folder_experiment}/{sample_id}/registered/{sample_id}_top_{ch}.tif')
-        #mask of the 2 sides to weight the image by the distance to the edges (intensity normalization)
-        mask_flip1 = reg_flip1>0
-        mask_flip2 = reg_flip2>0
-        mask_fused = mask_flip1 & mask_flip2
-        if mode =='linear' :
-            cumsum = np.cumsum(mask_fused,axis=axis).astype(np.float16)
-            cumsum_normalized = cumsum/np.max(cumsum)
-            w2 = cumsum_normalized #IN CASE OF PB TRY THIS FIRST : if positive sign to translation : w2=
-            w1=1-w2
-            #saves the result in the fused folder
-            fusion = (reg_flip1*w1+ reg_flip2*w2).astype(np.uint16)
+    ###Takes the previously saved images (two registered sides)
+    ref_image = tifffile.imread(rf'{path_registered_data}/{reference_image_reg}')
+    float_image = tifffile.imread(rf'{path_registered_data}/{floating_image_reg}')
+    mask_r = ref_image>0
+    mask_f = float_image>0
+    mask_fused = mask_r & mask_f
+    cumsum = np.cumsum(mask_fused,axis=axis).astype(np.float16) #we take the cumulative sum  along the fusion axis, this will give me a linear weight.
+    cumsum_normalized = cumsum/np.max(cumsum)
 
-        tifffile.imwrite(folder_output+rf'/{sample_id}_{ch}_fused.tif', fusion)
+    #apply a sigmoid function to the linear weights, to get a smooth transition between the two sides
+    w2=sigmoid(cumsum_normalized,x0=0.5,p=slope_coeff)
+    w1=1-w2
 
-def write_hyperstacks(folder_experiment:str,
+    fusion = (ref_image*w1+ float_image*w2).astype(np.uint16)
+
+    tifffile.imwrite(rf'{folder_output}/{name_output}', fusion)
+
+
+def write_hyperstacks(path:str,
                       sample_id:str,
                       channels:list) :
-    image = tifffile.imread(rf'{folder_experiment}\{sample_id}\fused\{sample_id}_{channels[0]}_fused.tif',dtype=np.int16)
+    image = tifffile.imread(rf'{path}\{sample_id}_{channels[0]}_fused.tif',dtype=np.int16)
     (z,x,y)=image.shape
     new_image = np.zeros((z,len(channels),x,y))
     print(new_image.shape)
     for ch in range(len(channels)) :
-        one_channel = tifffile.imread(rf'{folder_experiment}\{sample_id}\fused\{sample_id}_{channels[ch]}_fused.tif',dtype=np.int16)
+        one_channel = tifffile.imread(rf'{path}\{sample_id}_{channels[ch]}_fused.tif',dtype=np.int16)
         new_image[:,ch,:,:]=one_channel
         print(one_channel.shape,new_image.shape)
-    tifffile.imwrite(rf'{folder_experiment}\{sample_id}_registered.tif',new_image)
+    tifffile.imwrite(rf'{path}\{sample_id}_registered.tif',new_image)
 
 
 
