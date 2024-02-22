@@ -1,4 +1,4 @@
-from ._reconstruct import extract_positions,plot_positions,associate_top_bottom,manual_registration_fct,register,create_folders,check_napari,fuse_sides,write_hyperstacks
+from ._reconstruct import extract_positions,plot_positions,associate_top_bottom,manual_registration_fct,register,create_folders,check_napari,fuse_sides,sigmoid,write_hyperstacks,add_centermass
 
 __all__ = ("extract_positions",
            "plot_positions",
@@ -8,4 +8,6 @@ __all__ = ("extract_positions",
            "create_folders",
            "check_napari",
            "fuse_sides",
-           "write_hyperstacks")
+           "sigmoid",
+           "write_hyperstacks",
+           "add_centermass")

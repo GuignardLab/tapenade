@@ -102,9 +102,9 @@ def associate_top_bottom(path_bottom_positions:str,path_top_positions:str):
 
 
 
-def create_folders(folder_experiment:str,
-                   list_bottom:list,
-                   list_top:list,
+def create_folders(name_experiment:str,
+                   list_ref:list,
+                   list_float:list,
                    channels:list,
                    folder_output:str=''):
     """
@@ -114,10 +114,10 @@ def create_folders(folder_experiment:str,
     ----------
     folder_experiment : str
         path to the main folder
-    list_bottom : list
-        list of the numbers of the bottom images
-    list_top : list
-        list of the numbers of the top images
+    list_ref : list
+        list of the refrence images
+    list_float : list
+        list of the floating images corresponding to the reference images
     channels : list
         list of the names of the channels
     folder_output : str, optional
@@ -125,29 +125,29 @@ def create_folders(folder_experiment:str,
     """
         
     if folder_output=='' :
-        folder_output=folder_experiment
+        folder_output=name_experiment
 
-    list_samples=[str(i+1) for i in range(len(list_bottom))] #to look at every sample from the acquisition
-
-    for ind_g,name in enumerate(list_samples) : #for each sample, creates a dedicated folder and save the channels separately
-        folder_sample = rf'{folder_experiment}/{name}/'
+    for ind_g in range(len(list_ref)) : #for each sample, creates a dedicated folder and save the channels separately
+        filename_ref = list_ref[ind_g]
+        filename_float = list_float[ind_g]
+        folder_sample = rf'{name_experiment}/{filename_ref}/'
 
     #creates paths for the output files
-        os.mkdir(os.path.join(folder_experiment,name))
+        os.mkdir(os.path.join(name_experiment,filename_ref))
         os.mkdir(os.path.join(folder_sample,"trsf"))
         os.mkdir(os.path.join(folder_sample,"raw"))
         os.mkdir(os.path.join(folder_sample,"registered"))
-        num_bottom = list_bottom[ind_g]
-        num_top = list_top[ind_g]
-        image_bottom = tifffile.imread(rf'{folder_experiment}/{num_bottom}_bottom.tif')
-        image_top = tifffile.imread(rf'{folder_experiment}/{num_top}_top.tif')
+
+
+        image_ref = tifffile.imread(rf'{name_experiment}/{filename_ref}.tif')
+        image_float = tifffile.imread(rf'{name_experiment}/{filename_float}.tif')
         for ind_ch,ch in enumerate(channels) :
-            tifffile.imwrite(folder_sample+rf"/raw/{name}_bot_{ch}.tif",image_bottom[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
-            tifffile.imwrite(folder_sample+rf"/raw/{name}_top_{ch}.tif",image_top[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
+            tifffile.imwrite(folder_sample+rf"/raw/{filename_ref}_{ch}.tif",image_ref[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
+            tifffile.imwrite(folder_sample+rf"/raw/{filename_float}_{ch}.tif",image_float[:,ind_ch,:,:])#,imagej=True, metadata={'axes': 'TZYX'})
 
 
 
-def manual_registration_fct(reference_landmarks, floating_landmarks):
+def manual_registration_fct(reference_landmarks, floating_landmarks,scale:tuple=(1,1,1)):
 #stolen from https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py
     """
     Finds the transformation between 2 sets of points in 3D.
@@ -171,9 +171,11 @@ def manual_registration_fct(reference_landmarks, floating_landmarks):
 
     rg_ref=regionprops(reference_landmarks)
     centroids_ref=np.array([prop.centroid for prop in rg_ref]).T
+    centroids_ref=centroids_ref*scale
+
     rg_float=regionprops(floating_landmarks)
     centroids_float=np.array([prop.centroid for prop in rg_float]).T
-
+    centroids_float=centroids_float*scale
 
     assert centroids_ref.shape == centroids_float.shape
 
@@ -189,13 +191,9 @@ def manual_registration_fct(reference_landmarks, floating_landmarks):
     centermass_ref = np.mean(centroids_ref, axis=1)
     centermass_float = np.mean(centroids_float, axis=1)
 
-    # ensure centermasss are 3x1
-    centermass_ref = centermass_ref.reshape(-1, 1)
-    centermass_float = centermass_float.reshape(-1, 1)
-
     # subtract mean
-    centroids_ref_centered = centroids_ref - centermass_ref
-    centroids_float_centered = centroids_float - centermass_float
+    centroids_ref_centered = centroids_ref - centermass_ref.reshape(3, 1)
+    centroids_float_centered = centroids_float - centermass_float.reshape(3, 1)
 
     H = centroids_ref_centered @ np.transpose(centroids_float_centered)
 
@@ -209,14 +207,17 @@ def manual_registration_fct(reference_landmarks, floating_landmarks):
         Vt[2,:] *= -1
         R = Vt.T @ U.T
 
-    t = R @ centermass_ref + centermass_float
     rotation = Rotation.from_matrix(R)
-    rotation_angles = rotation.as_euler('zyx', degrees=True)
-    rotation_z, rotation_y, rotation_x = rotation_angles
-    trans_z,trans_y,trans_x=t
+    rotation_angles = rotation.as_euler('xyz', degrees=True)
 
+   # translation1 is the translation that will center the floating landmarks on the center of the image.
+    #Then, we will apply the rotation with respect to the center (the center of mass stays at the center))
+    #Afterwards, we apply translation2 to center the floating landmarks that was located at the center, on the reference position.
 
-    return (rotation_z,rotation_y,rotation_x,trans_z,trans_y,trans_x)
+    center_image = (np.array(reference_landmarks.shape)/2)*scale
+    translation1 = center_image - centermass_float
+    translation2 = centermass_ref- center_image
+    return (rotation_angles,translation1,translation2)
 
 
 def register(path_data:str,
@@ -232,6 +233,8 @@ def register(path_data:str,
              test_init:int=0,
              trsf_type:str='rigid',
              depth:int=3,
+             bbox:int=1,
+             padding:int=0,
              save_json:str='') :
 
 
@@ -267,7 +270,9 @@ def register(path_data:str,
     # trsf_type : str, optional
     #     type of transformation to compute : rigid, affine. By default rigid.
     # depth : int, optional
-        
+    #     depth of the registration, by default 3
+    # bbox : int, optional
+    #     1 if the bounding box of the original image can extend, 0 if not.
     # save_json : bool, optional
     #     if True, saves the parameters in a json file, in the main folder. By default False.
 
@@ -289,7 +294,8 @@ def register(path_data:str,
             "out_pattern": path_registered_data,
             "begin" : 1,
             "end":1,
-            "bbox_out": 1,
+            "bbox_out": bbox,
+            "padding":padding,
             "registration_depth":depth,
         }
 
@@ -302,27 +308,43 @@ def register(path_data:str,
     tr.run_trsf()
 
 def check_napari(path_registered_data:str,
-                 reference_image:str,
-                 floating_image:str,
+                 reference_image,
+                 floating_image,
+                 additional_images:list=[],
                  scale:tuple=(1,1,1)) :
     """
     Opens the registered images in napari , to check how they overlap
 
     Parameters
     ----------
-    folder_experiment : str
-        path to the main folder
-    sample_id : str
+    path_registered_data : str
+        path to the registered images
+    reference_image : str or ndarray (can be the name of the array in path_registered_data or the array itself)
+        name of the reference image, the 'fixed' one
+    floating_image : str or ndarray (can be the name of the array in path_registered_data or the array itself)
+        name of the floating image, the one that will be registered onto the reference image
+    additional_images : list of ndarray, optional
+        list of additional images to add to the viewer, by default []
     scale : tuple, optional
         scale of the image (should be the same ), by default (1,1,1)
     """
 
 
     viewer=napari.Viewer()
-    ref_im = tifffile.imread(rf'{path_registered_data}/{reference_image}') 
-    float_im = tifffile.imread(rf'{path_registered_data}/{floating_image}')
-    viewer.add_image(ref_im,colormap='cyan',name=rf'{reference_image}',scale=scale)
-    viewer.add_image(float_im,colormap='red',blending='additive',name=rf'{floating_image}',scale=scale)
+    if isinstance(reference_image, str) : #if the value given is the name of the array in the folder 'path_registered_data'
+        ref_im = tifffile.imread(rf'{path_registered_data}/{reference_image}') 
+    else : #if the value given is the ndarray 'reference_image' itself
+        ref_im = reference_image 
+    if isinstance(floating_image, str) :
+        float_im = tifffile.imread(rf'{path_registered_data}/{floating_image}')
+    else :
+        float_im = floating_image
+    viewer.add_image(ref_im,colormap='cyan',name='reference_image',scale=scale)
+    viewer.add_image(float_im,colormap='red',blending='additive',name='floating_image',scale=scale)
+    if additional_images != [] :
+        for im in additional_images :
+            viewer.add_image(im,colormap='green',blending='additive',name=rf'{im}',scale=scale)
+
     napari.run()
 
 
@@ -392,8 +414,23 @@ def write_hyperstacks(path:str,
         print(one_channel.shape,new_image.shape)
     tifffile.imwrite(rf'{path}\{sample_id}_registered.tif',new_image)
 
+def add_centermass(landmarks,radius:int=10,centermass_label:int=10) :
+    """
+    For debug purposes : if the registration does not work, you can use this function on the landmarks image to check if the center of mass is correcly aligned after the rotation.
+    
+    Parameters
+    ----------
+    landmarks : np.array
+        array containing the landmarks (can be float or reference)
+    radius : int, optional
+        radius of the sphere to add around the center of mass, by default 10
+    """
 
-
+    rg=regionprops(landmarks)
+    centroids=np.array([prop.centroid for prop in rg]).T
+    z,y,x = np.mean(centroids,axis=1)
+    landmarks[int(z)-radius:int(z)+radius,int(y)-radius:int(y)+radius,int(x)-radius:int(x)+radius]=centermass_label
+    return(landmarks)
 
 
 
