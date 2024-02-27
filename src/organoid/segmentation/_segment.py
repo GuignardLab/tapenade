@@ -1,9 +1,14 @@
 
 import numpy as np
-from csbdeep.utils import normalize
-from stardist import  random_label_cmap
-from stardist import random_label_cmap
-from stardist.models import StarDist3D
+try :
+    from csbdeep.utils import normalize
+    from stardist import  random_label_cmap
+    from stardist import random_label_cmap
+    from stardist.models import StarDist3D
+except ImportError :
+    print("Please install the required packages: pip install stardist csbdeep")
+
+
 np.random.seed(6)
 lbl_cmap = random_label_cmap
 
