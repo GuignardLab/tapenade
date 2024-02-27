@@ -1,5 +1,5 @@
-from organoid.segmentation import predict_stardist
-import numpy as np
+# from organoid.segmentation import predict_stardist
+# import numpy as np
 
 # def test_pred():
 #     array=np.ones((50,512,512))
