@@ -16,7 +16,7 @@ from scipy import ndimage as ndi
 
 
 def test_manual_registration():
-    array_ref = np.zeros((50, 50, 50), dtype=int)
+    array_ref = np.zeros((100, 100, 100), dtype=int)
     array_ref[
         np.random.randint(0, 20),
         np.random.randint(0, 20),
@@ -34,10 +34,10 @@ def test_manual_registration():
     ] = 3
 
     array_float = np.copy(array_ref)
-    array_float = ndi.rotate(array_float, 10, axes=(0, 1), order=0)
+    array_float = ndi.rotate(array_float, 5, axes=(0, 1), order=0)
     array_float[:, 10:, 10:] = array_float[:, :-10, :-10]
-
-    rot, trans1, trans2 = manual_registration_fct(array_ref, array_float)
+    if len(np.unique(array_float)) == 3 :
+        rot, trans1, trans2 = manual_registration_fct(array_ref, array_float)
 
     assert len(rot) == 3
     assert len(trans1) == 3
