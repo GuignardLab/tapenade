@@ -10,6 +10,7 @@ from ._reconstruct import (
     sigmoid,
     write_hyperstacks,
     add_centermass,
+    remove_previous_files
 )
 
 __all__ = (
@@ -24,4 +25,5 @@ __all__ = (
     "sigmoid",
     "write_hyperstacks",
     "add_centermass",
+    "remove_previous_files"
 )

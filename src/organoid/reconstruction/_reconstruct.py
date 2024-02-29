@@ -14,9 +14,8 @@ import registrationtools
 import tifffile
 from xml.dom import minidom
 import napari
-
-# Remains to be done/solved :
-# should we keep the names 'bottom' and 'top' ? or should we use 'reference' and 'floating' ? view1 and view 2 ?
+import glob
+from pathlib import Path
 
 
 def extract_positions(path_positions: str):
@@ -228,6 +227,13 @@ def manual_registration_fct(
         print("det(R) < R, reflection detected!, correcting for it ...")
         Vt[2, :] *= -1
         R = Vt.T @ U.T
+    t = -R @ centermass_ref + centermass_float
+
+    trsf = np.identity(4)
+    trsf[0:3, 0:3] = R
+    trsf[0:3, 3] = t
+    trsf = np.linalg.lstsq(trsf, np.identity(4))[0]
+    np.savetxt("trsf.txt", trsf)
 
     rotation = Rotation.from_matrix(R)
     rotation_angles = rotation.as_euler("xyz", degrees=True)
@@ -267,9 +273,10 @@ def register(
     trsf_type: str = "rigid",
     depth: int = 3,
     bbox: int = 1,
-    padding: int = 0,
     image_interpolation: str = "linear",
+    padding: int = 0,
     save_json: str = "",
+    ordered_init_trsfs: bool = True,
 ):
 
     ##this is under comments because if i put quotation marks, the importation fails (?)
@@ -306,41 +313,37 @@ def register(
     #     depth of the registration, by default 3
     # bbox : int, optional
     #     1 if the bounding box of the original image can extend, 0 if not.
-    #     CAREFUL : if test_init=1, bbox is not taken into account
-    # padding : int, optional
-    #     padding to add to the bounding box, by default 0
     # save_json : bool, optional
     #     if True, saves the parameters in a json file, in the main folder. By default False.
 
     data = {
         "path_to_bin": path_to_bin,  # necessary to register the data
-        "path_to_data": path_data,
+        "path_to_data": str(path_data),
         "ref_im": reference_image,  # rf"{sample_id}_bot_{channel}.tif",
         "flo_ims": [floating_image],  # [rf"{sample_id}_top_{channel}.tif"],
         "compute_trsf": compute_trsf,
         "init_trsfs": init_trsfs,
-        "trsf_paths": [path_transformation],
+        "trsf_paths": [str(path_transformation)],
         "trsf_types": [trsf_type],
         "ref_voxel": input_voxel,
         "flo_voxels": [input_voxel],
         "out_voxel": output_voxel,
         "test_init": test_init,
         "apply_trsf": 1,
-        "out_pattern": path_registered_data,
+        "out_pattern": str(path_registered_data),
         "begin": 1,
         "end": 1,
         "bbox_out": bbox,
-        "padding": padding,
         "image_interpolation": image_interpolation,
-        "ordered_init_trsfs": 1,
+        "padding": padding,
         "registration_depth": depth,
+        "ordered_init_trsfs": ordered_init_trsfs,
     }
+    print(data)
 
-    if save_json is not "":
-        json_string = json.dumps(
-            data, indent=4
-        )  # indent is to print it in a more readable way
-        with open(save_json + "\parameters.json", "w") as outfile:
+    if save_json != "":
+        json_string = json.dumps(data, indent=4)
+        with open(Path(save_json) / "parameters.json", "w") as outfile:
             outfile.write(json_string)
 
     tr = registrationtools.SpatialRegistration(data)
@@ -361,11 +364,11 @@ def check_napari(
 
     Parameters
     ----------
-    path_registered_data : str
-        path to registration folder
-    reference_image : str or ndarray (can be the name of the array in path_registered_data or the array itself)
+    path_data : str
+        path to the registered images
+    reference_image : str or ndarray (can be the name of the array in path_data or the array itself)
         name of the reference image, the 'fixed' one
-    floating_image : str or ndarray (can be the name of the array in path_registered_data or the array itself)
+    floating_image : str or ndarray (can be the name of the array in path_data or the array itself)
         name of the floating image, the one that will be registered onto the reference image
     additional_images : list of ndarray, optional
         list of additional images to add to the viewer, by default []
@@ -374,13 +377,6 @@ def check_napari(
     """
 
     viewer = napari.Viewer()
-    if isinstance(
-        floating_image, str
-    ):  # if the value given is the NAME of the array in the folder
-        float_im = tifffile.imread(rf"{path_data}/registered/{floating_image}")
-    else:  # if the value given is the ndarray 'floating_image' itself
-        float_im = floating_image
-
     if isinstance(reference_image, str):
         if os.path.exists(
             rf"{path_data}/registered/{reference_image}"
@@ -393,7 +389,12 @@ def check_napari(
     else:
         ref_im = reference_image
 
-    if labels == False:
+    if isinstance(floating_image, str):
+        float_im = tifffile.imread(rf"{path_data}/registered/{floating_image}")
+    else:
+        float_im = floating_image
+
+    if not labels:
         viewer.add_image(
             ref_im, colormap="cyan", name="reference_image", scale=scale
         )
@@ -413,19 +414,13 @@ def check_napari(
                     name=names_additional_images[num_im],
                     scale=scale,
                 )
-    if labels == True:
+    if labels:
         viewer.add_labels(ref_im, name="reference_image", scale=scale)
-        viewer.add_labels(
-            float_im, blending="additive", name="floating_image", scale=scale
-        )
+        viewer.add_labels(float_im, name="floating_image", scale=scale)
         if additional_images != []:
             for num_im, im in enumerate(additional_images):
-                viewer.add_labels(
-                    im,
-                    opacity="0.5",
-                    name=names_additional_images[num_im],
-                    scale=scale,
-                )
+                name = names_additional_images[num_im]
+                viewer.add_labels(im, name=str(name), scale=scale)
 
     napari.run()
 
@@ -455,59 +450,60 @@ def fuse_sides(
     Parameters
     ----------
     path_registered_data : str
-        path to the registration folder
+        path to the registered images
     reference_image_reg : str
         name of the reference image, the 'fixed' one
     floating_image_reg : str
         name of the floating image, the one that will be registered onto the reference image
-    folder_output : str, optional
-        path to the output folder, by default ""
+    folder_output : str
+        path to the folder where the fused image will be saved
     name_output : str, optional
-        name of the output which is the fused image , by default 'fusion'
     slope_coeff : int, optional
         coefficient to apply to the sigmoid function, by default 20.
-        5 corresponds to a low slope, wide fusion width and 25 to a strong slope, very thin fusion width.
-
+        name of the output which is the fused image , by default 'fusion'
     axis : int, optional
         axis along which the fusion is done, by default 0 (z axis)
     """
+
+    ###Takes the previously saved images (two registered sides)
     ref_image = tifffile.imread(
         rf"{path_registered_data}/{reference_image_reg}"
     )
     float_image = tifffile.imread(
         rf"{path_registered_data}/{floating_image_reg}"
     )
-
-    # we take the cumulative sum of the whole object along the fusion axis, this will give me a linear weight.
     mask_r = ref_image > 0
     mask_f = float_image > 0
     mask_fused = mask_r & mask_f
-    cumsum = np.cumsum(mask_fused, axis=axis).astype(np.float16)
+    cumsum = np.cumsum(mask_fused, axis=axis).astype(
+        np.float16
+    )  # we take the cumulative sum  along the fusion axis, this will give me a linear weight.
     cumsum_normalized = cumsum / np.max(cumsum)
 
     # apply a sigmoid function to the linear weights, to get a smooth transition between the two sides
     w2 = sigmoid(cumsum_normalized, x0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
-    fusion = ref_image * w1 + float_image * w2
+    fusion = (ref_image * w1 + float_image * w2).astype(np.uint16)
 
-    tifffile.imwrite(
-        rf"{folder_output}/{name_output}", fusion.astype(np.uint16)
-    )
+    tifffile.imwrite(rf"{folder_output}/{name_output}", fusion)
 
 
 def write_hyperstacks(path: str, sample_id: str, channels: list):
     image = tifffile.imread(
-        rf"{path}\{sample_id}_{channels[0]}_fused.tif", dtype=np.int16
+        Path(path) / f"{sample_id}_{channels[0]}_fused.tif", dtype=np.int16
     )
     (z, x, y) = image.shape
     new_image = np.zeros((z, len(channels), x, y))
+    print(new_image.shape)
     for ch in range(len(channels)):
         one_channel = tifffile.imread(
-            rf"{path}\{sample_id}_{channels[ch]}_fused.tif", dtype=np.int16
+            Path(path) / f"{sample_id}_{channels[ch]}_fused.tif",
+            dtype=np.int16,
         )
         new_image[:, ch, :, :] = one_channel
-    tifffile.imwrite(rf"{path}\{sample_id}_registered.tif", new_image)
+        print(one_channel.shape, new_image.shape)
+    tifffile.imwrite(Path(path) / f"{sample_id}_registered.tif", new_image)
 
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
@@ -531,6 +527,12 @@ def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
         int(x) - radius : int(x) + radius,
     ] = centermass_label
     return landmarks
+
+
+def remove_previous_files(path):
+    filelist = glob.glob(os.path.join(path, "*.tif"))
+    for f in filelist:
+        os.remove(f)
 
 
 def reconstruct_foo():
