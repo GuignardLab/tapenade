@@ -1,7 +1,6 @@
 from organoid.reconstruction import (
     extract_positions,
     plot_positions,
-    associate_floatbottom,
     manual_registration_fct,
     register,
     create_folders,
