@@ -455,41 +455,45 @@ def fuse_sides(
     Parameters
     ----------
     path_registered_data : str
-        path to the registered images
+        path to the registration folder
     reference_image_reg : str
         name of the reference image, the 'fixed' one
     floating_image_reg : str
         name of the floating image, the one that will be registered onto the reference image
-    folder_output : str
-        path to the folder where the fused image will be saved
+    folder_output : str, optional
+        path to the output folder, by default ""
     name_output : str, optional
         name of the output which is the fused image , by default 'fusion'
+    slope_coeff : int, optional
+        coefficient to apply to the sigmoid function, by default 20.
+        5 corresponds to a low slope, wide fusion width and 25 to a strong slope, very thin fusion width.
+
     axis : int, optional
         axis along which the fusion is done, by default 0 (z axis)
     """
-
-    ###Takes the previously saved images (two registered sides)
     ref_image = tifffile.imread(
         rf"{path_registered_data}/{reference_image_reg}"
     )
     float_image = tifffile.imread(
         rf"{path_registered_data}/{floating_image_reg}"
     )
+
+    # we take the cumulative sum of the whole object along the fusion axis, this will give me a linear weight.
     mask_r = ref_image > 0
     mask_f = float_image > 0
     mask_fused = mask_r & mask_f
-    cumsum = np.cumsum(mask_fused, axis=axis).astype(
-        np.float16
-    )  # we take the cumulative sum  along the fusion axis, this will give me a linear weight.
+    cumsum = np.cumsum(mask_fused, axis=axis).astype(np.float16)
     cumsum_normalized = cumsum / np.max(cumsum)
 
     # apply a sigmoid function to the linear weights, to get a smooth transition between the two sides
     w2 = sigmoid(cumsum_normalized, x0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
-    fusion = (ref_image * w1 + float_image * w2).astype(np.uint16)
+    fusion = ref_image * w1 + float_image * w2
 
-    tifffile.imwrite(rf"{folder_output}/{name_output}", fusion)
+    tifffile.imwrite(
+        rf"{folder_output}/{name_output}", fusion.astype(np.uint16)
+    )
 
 
 def write_hyperstacks(path: str, sample_id: str, channels: list):
