@@ -1,11 +1,11 @@
-
 import numpy as np
-try :
+
+try:
     from csbdeep.utils import normalize
-    from stardist import  random_label_cmap
+    from stardist import random_label_cmap
     from stardist import random_label_cmap
     from stardist.models import StarDist3D
-except ImportError :
+except ImportError:
     print("Please install the required packages: pip install stardist csbdeep")
 
 
@@ -17,8 +17,12 @@ from pathlib import Path
 import os
 
 
-
-def predict_stardist(array, model_path:str,input_voxelsize:tuple=(1,1,1),normalize_input:bool=True) :
+def predict_stardist(
+    array,
+    model_path: str,
+    input_voxelsize: tuple = (1, 1, 1),
+    normalize_input: bool = True,
+):
     """
     Predict the segmentation of an array using a StarDist model.
     :param array: The array to segment.
@@ -27,15 +31,21 @@ def predict_stardist(array, model_path:str,input_voxelsize:tuple=(1,1,1),normali
     :param normalize_input: Whether to normalize the input array.
     :return: The predicted segmentation.
     """
-    assert len(np.shape(array))<=3
+    assert len(np.shape(array)) <= 3
     model_name = Path(model_path).stem
     directory = str(os.path.split(model_path)[0])
-    model = StarDist3D(None,name=model_name,basedir=directory)
+    model = StarDist3D(None, name=model_name, basedir=directory)
 
-    data = change_voxelsize(array,input_vs=input_voxelsize,output_vs=(0.7,0.7,0.7),order=1)
+    data = change_voxelsize(
+        array, input_vs=input_voxelsize, output_vs=(0.7, 0.7, 0.7), order=1
+    )
     if normalize_input:
-        data = normalize(data,1,99)
-    labels,_ = model.predict_instances(data,axes='ZYX',n_tiles = model._guess_n_tiles(data))
-    aniso_labels = change_voxelsize(labels,input_vs=(0.7,0.7,0.7),output_vs=input_voxelsize, order=0)
+        data = normalize(data, 1, 99)
+    labels, _ = model.predict_instances(
+        data, axes="ZYX", n_tiles=model._guess_n_tiles(data)
+    )
+    aniso_labels = change_voxelsize(
+        labels, input_vs=(0.7, 0.7, 0.7), output_vs=input_voxelsize, order=0
+    )
 
-    return(np.asarray(aniso_labels).astype(np.int16))
+    return np.asarray(aniso_labels).astype(np.int16)

@@ -268,6 +268,7 @@ def register(
     depth: int = 3,
     bbox: int = 1,
     padding: int = 0,
+    image_interpolation: str = "linear",
     save_json: str = "",
 ):
 
@@ -330,6 +331,7 @@ def register(
         "end": 1,
         "bbox_out": bbox,
         "padding": padding,
+        "image_interpolation": image_interpolation,
         "ordered_init_trsfs": 1,
         "registration_depth": depth,
     }
