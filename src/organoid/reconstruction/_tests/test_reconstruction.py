@@ -17,31 +17,22 @@ from scipy import ndimage as ndi
 
 def test_manual_registration():
     array_ref = np.zeros((100, 100, 100), dtype=int)
-    array_ref[
-        np.random.randint(0, 20),
-        np.random.randint(0, 20),
-        np.random.randint(0, 20),
-    ] = 1
-    array_ref[
-        np.random.randint(0, 20),
-        np.random.randint(0, 20),
-        np.random.randint(0, 20),
-    ] = 2
-    array_ref[
-        np.random.randint(0, 20),
-        np.random.randint(0, 20),
-        np.random.randint(0, 20),
-    ] = 3
+    array_float = np.zeros((100, 100, 100), dtype=int)
+    array_ref[40,55,30] =1
+    array_ref[63,37,49] =2
+    array_ref[51,25,28] =3
+    array_float[40,74,45] =1
+    array_float[63,49,53] =2
+    array_float[51,49,29] =3
 
-    array_float = np.copy(array_ref)
-    array_float = ndi.rotate(array_float, 5, axes=(0, 1), order=0)
-    array_float[:, 10:, 10:] = array_float[:, :-10, :-10]
-    if len(np.unique(array_float)) == 3 :
-        rot, trans1, trans2 = manual_registration_fct(array_ref, array_float)
-
-    assert len(rot) == 3
-    assert len(trans1) == 3
-    assert len(trans2) == 3
-    # assert rot != [0, 0, 0]
-    # assert trans1 != [0, 0, 0]
-    # assert trans2 != [0, 0, 0]
+    rot_applied= [30,0,0]
+    trans1_applied= [-1.3,-7.3,7.6]
+    trans2_applied= [1.3,-11,-14.3]
+    
+    rot, trans1, trans2 = manual_registration_fct(array_ref, array_float)
+    error_rot = abs(np.subtract(rot_applied,rot))
+    error_trans1 = abs(np.subtract(trans1_applied,trans1))
+    error_trans2 = abs(np.subtract(trans2_applied,trans2))
+    assert(all(error_rot<[3,3,3]))
+    assert(all(error_trans1<[3,3,3]))
+    assert(all(error_trans2<[3,3,3]))
