@@ -1,16 +1,16 @@
 from ._reconstruct import (
-    extract_positions,
-    plot_positions,
+    add_centermass,
     associate_top_bottom,
-    manual_registration_fct,
-    register,
-    create_folders,
     check_napari,
+    create_folders,
+    extract_positions,
     fuse_sides,
+    manual_registration_fct,
+    plot_positions,
+    register,
+    remove_previous_files,
     sigmoid,
     write_hyperstacks,
-    add_centermass,
-    remove_previous_files
 )
 
 __all__ = (
@@ -25,5 +25,5 @@ __all__ = (
     "sigmoid",
     "write_hyperstacks",
     "add_centermass",
-    "remove_previous_files"
+    "remove_previous_files",
 )
