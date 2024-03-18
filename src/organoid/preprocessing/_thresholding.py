@@ -1,0 +1,293 @@
+import numpy as np
+
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage.morphology import binary_fill_holes
+from scipy.signal import argrelextrema
+from skimage.filters import threshold_otsu
+from skimage.measure import label
+from skimage.morphology import convex_hull_image
+from skimage.transform import resize, rescale
+from organoid.preprocessing._smoothing import _smooth_gaussian
+
+
+def _snp_threshold_binarization(
+    image: np.ndarray, sigma_blur: float, threshold_factor: float
+) -> np.ndarray:
+    """
+    Threshold image based on signal-and-noise product.
+
+    Parameters:
+    - image: numpy array, input image
+    - sigma_blur: float, standard deviation of the Gaussian blur.
+    - threshold_factor: float, factor to multiply the threshold
+
+    Returns:
+    - binary_mask: numpy array, binary mask computed using SNP thresholding
+    """
+
+    nonzero_mask = image > 0
+
+    if np.any(nonzero_mask):
+        blurred = _smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
+        blurred2 = _smooth_gaussian(
+            image**2, mask=nonzero_mask, sigmas=sigma_blur
+        )
+
+        sigma = blurred2 - blurred**2
+
+        snp_array = sigma * blurred
+        snp_mask = snp_array > 0
+        # snp_array = np.log(snp_array, where=(snp_array != 0))
+
+        snp_array = np.log(
+            snp_array, where=np.logical_and(nonzero_mask, snp_mask)
+        )
+    else:
+        blurred = _smooth_gaussian(image, sigmas=sigma_blur)
+        blurred2 = _smooth_gaussian(image**2, sigmas=sigma_blur)
+
+        sigma = blurred2 - blurred**2
+
+        snp_array = sigma * blurred
+        snp_mask = snp_array > 0
+        # snp_array = np.log(snp_array, where=(snp_array != 0))
+
+        snp_array = np.log(snp_array, where=snp_mask)
+
+    threshold = threshold_otsu(snp_array[snp_mask]) * threshold_factor
+
+    # Create a binary mask
+    # binary_mask = snp_array > threshold
+    binary_mask = np.logical_and(snp_array > threshold, snp_mask)
+
+    return binary_mask
+
+
+def _otsu_threshold_binarization(
+    image: np.ndarray, sigma_blur: float, threshold_factor: float
+) -> np.ndarray:
+    """
+    Threshold image based on histogram values.
+
+    Parameters:
+    - image: numpy array, input image
+    - sigma_blur: float, standard deviation of the Gaussian blur.
+    - threshold_factor: float, factor to multiply the threshold
+
+    Returns:
+    - binary_mask: numpy array, binary mask computed using histogram thresholding
+    """
+
+    blurred = gaussian_filter(image, sigma=sigma_blur)
+
+    threshold = threshold_otsu(blurred) * threshold_factor
+
+    # Create a binary mask
+    binary_mask = blurred > threshold
+
+    return binary_mask
+
+
+def _histomin_threshold_binarization(
+    image: np.ndarray, sigma_blur: float, threshold_factor: float
+) -> np.ndarray:
+    """
+    Threshold image based on histogram values.
+
+    Parameters:
+    - image: numpy array, input image
+    - sigma_blur: float, standard deviation of the Gaussian blur.
+    - threshold_factor: float, factor to multiply the threshold
+
+    Returns:
+    - binary_mask: numpy array, binary mask computed using histogram thresholding
+    """
+
+    blurred = gaussian_filter(image, sigma=sigma_blur)
+
+    freqs, bins = np.histogram(blurred.ravel(), bins=256)
+
+    # # Smooth the histogram using a uniform filter
+    # freqs = uniform_filter(np.log(1 + freqs), 16, mode="nearest")
+
+    # Find the local minima in the smoothed histogram
+    threshold_candidates_args = argrelextrema(freqs, np.less_equal, order=1)[0]
+    threshold_candidates_args = threshold_candidates_args[
+        np.nonzero(threshold_candidates_args)
+    ]
+
+    # Select the threshold value as the first frequency minimum
+    threshold = bins[threshold_candidates_args[0]] * threshold_factor
+
+    # Create a binary mask
+    binary_mask = blurred > threshold
+
+    return binary_mask
+
+
+### POST-PROCESSING FUNCTIONS
+def _get_largest_connected_component(array: np.ndarray) -> np.ndarray:
+    """
+    Get the largest connected component in a binary array.
+
+    Parameters:
+    - array: Binary array.
+
+    Returns:
+    - mask_largest_cc: Binary mask of the largest connected component.
+    """
+    labels = label(array, connectivity=1)
+    mask_largest_cc = labels == np.argmax(np.bincount(labels.flat)[1:]) + 1
+    return mask_largest_cc
+
+
+def _compute_mask_convex_hull(
+    mask: np.ndarray, precision_factor: int
+) -> np.ndarray:
+    """
+    Compute the convex hull of the binary mask.
+
+    Parameters:
+    - mask: numpy array, binary mask
+    - precision_factor: int, factor to rescale the mask before computing the convex hull.
+      Bigger values will result in faster computation but less precise convex hulls.
+
+    Returns:
+    - hull_mask: numpy array, binary mask representing the convex hull of the input mask
+    """
+
+    hull_mask = mask.copy()
+
+    if precision_factor != 1:
+        # Rescale the mask if precision_factor is not 1
+        hull_mask = rescale(
+            hull_mask,
+            precision_factor,
+            anti_aliasing=False,
+            order=0,
+            preserve_range=True,
+        )
+
+    # Compute the convex hull of the mask
+    hull_mask = convex_hull_image(hull_mask)
+
+    if precision_factor != 1:
+        # Resize the convex hull mask to the original shape
+        hull_mask = resize(
+            hull_mask,
+            mask.shape,
+            anti_aliasing=False,
+            order=0,
+            preserve_range=True,
+        )
+
+    return hull_mask
+
+
+def _binary_fill_holes_on_each_slice(mask: np.ndarray) -> np.ndarray:
+    """
+    Fill holes in a binary mask on each slice. Apply the binary_fill_holes function
+    to each slice of the input mask twice sequentially.
+
+    Parameters:
+    - mask: numpy array, binary mask
+
+    Returns:
+    - mask: numpy array, binary mask with holes filled on each slice
+    """
+
+    filled_mask = mask.copy()
+
+    for i in range(mask.shape[0]):
+        filled_mask[i] = binary_fill_holes(filled_mask[i])
+    for i in range(filled_mask.shape[1]):
+        filled_mask[:, i] = binary_fill_holes(filled_mask[:, i])
+    for i in range(filled_mask.shape[2]):
+        filled_mask[:, :, i] = binary_fill_holes(filled_mask[:, :, i])
+    for i in range(filled_mask.shape[0]):
+        filled_mask[i] = binary_fill_holes(filled_mask[i])
+    for i in range(filled_mask.shape[1]):
+        filled_mask[:, i] = binary_fill_holes(filled_mask[:, i])
+    for i in range(filled_mask.shape[2]):
+        filled_mask[:, :, i] = binary_fill_holes(filled_mask[:, :, i])
+
+    return filled_mask
+
+
+def _refine_raw_mask(
+    mask: np.ndarray, compute_convex_hull: bool
+) -> np.ndarray:
+    """
+    Refine the raw mask by keeping only the largest connected component and filling holes.
+
+    Parameters:
+    - mask: numpy array, binary mask
+    - compute_convex_hull: bool, set to True to compute the convex hull of the mask
+
+    Returns:
+    - refined_mask: numpy array, refined binary mask
+    """
+    # Keep only the largest connected component
+    refined_mask = _get_largest_connected_component(mask)
+    # Fill holes in the mask
+    if compute_convex_hull:
+        refined_mask = _compute_mask_convex_hull(refined_mask, 2)
+    else:
+        refined_mask = binary_fill_holes(refined_mask)
+        refined_mask = _binary_fill_holes_on_each_slice(refined_mask)
+
+    return refined_mask
+
+
+###
+
+
+def _compute_mask(
+    image: np.ndarray,
+    method: str,
+    sigma_blur: float,
+    threshold_factor: float = 1,
+    compute_convex_hull: bool = False,
+) -> np.ndarray:
+    """
+    Process the mask for the given image.
+
+    Parameters:
+    - image: numpy array, input image
+    - method: str, method to use for thresholding. Can be 'snp' for Signal-Noise Product thresholding,
+      'otsu' for Otsu's thresholding, or 'histomin' for Histogram Minimum thresholding.
+    - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
+      around 1/3 of the typical object diameter.
+    - threshold_factor: float, factor to multiply the threshold
+    - compute_convex_hull: bool, set to True to compute the convex hull of the mask. If set to
+      False, a hole-filling operation will be performed instead.
+
+    Returns:
+    - mask: numpy array, binary mask of the same shape as the input image
+    """
+
+    # Normalize the image
+    percs = np.percentile(image, [1, 99])
+    im = (image - percs[0]) / (percs[1] - percs[0])
+    im = np.clip(im, 0, 1).astype(np.float32)
+
+    # Compute the mask
+    if method == "snp":
+        mask = _snp_threshold_binarization(
+            im / im.max(), sigma_blur, threshold_factor
+        )
+    elif method == "otsu":
+        mask = _otsu_threshold_binarization(
+            im / im.max(), sigma_blur, threshold_factor
+        )
+    elif method == "histomin":
+        mask = _histomin_threshold_binarization(
+            im / im.max(), sigma_blur, threshold_factor
+        )
+    else:
+        raise ValueError(f"Unknown thresholding method: {method}")
+
+    # Refine the mask by keeping only the largest connected component and filling holes
+    mask = _refine_raw_mask(mask, compute_convex_hull)
+
+    return mask

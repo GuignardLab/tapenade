@@ -2,77 +2,46 @@ import numpy as np
 
 from functools import partial
 from os import cpu_count
-from scipy.ndimage import zoom, rotate, uniform_filter
-from scipy.ndimage.morphology import binary_fill_holes
-from scipy.signal import argrelextrema
-from skimage.filters import threshold_otsu
-from skimage.measure import regionprops, label
-from sklearn.decomposition import PCA
+from scipy.ndimage import zoom, rotate
+from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
+from typing import Optional, Tuple, Union
 
-from organoid.preprocessing._smoothing import gaussian_smooth
-from organoid.preprocessing._local_normalization import local_normalization
+from organoid.preprocessing._local_normalization import _local_normalization
+from organoid.preprocessing._thresholding import _compute_mask
+from organoid.preprocessing._axis_alignment import (
+    _compute_rotation_angle_and_indices,
+)
 
 """
 In typical order:
     1. making array isotropic
     2. compute mask
     3. local image normalization
-    (4. spatial regi, not covered here)
     (4. segmentation, not covered here)
-    (5. registration, not covered here)
-    6. aligning major axis
-    7. cropping array using mask
+    (5. spatial registration, not covered here)
+    (6. temporal registration, not covered here)
+    7. aligning major axis
+    (8. cropping array using mask)
 """
 
 
-def local_image_normalization(image, box_size, perc_low, perc_high):
-    """
-    Performs local image normalization on either a single image or a temporal stack of images.
-    Stretches the image histogram in local neighborhoods by remapping intesities in the range
-    [perc_low, perc_high] to the range [0, 1]. 
-    This helps to enhance the contrast and improve the visibility of structures in the image.
-
-    Parameters:
-    - image: numpy array, input image or temporal stack of images
-    - box_size: int, size of the local neighborhood for normalization
-    - perc_low: float, lower percentile for intensity normalization
-    - perc_high: float, upper percentile for intensity normalization
-
-    Returns:
-    - image_norm: numpy array, normalized image or stack of normalized images
-    """
-
-    is_temporal = image.ndim == 4
-
-    if is_temporal:
-        # Apply local normalization to each time frame in the temporal stack
-        image_norm = np.array(
-            [local_normalization(
-                image[ind_t], 
-                box_size=box_size, 
-                perc_low=perc_low, 
-                perc_high=perc_high
-            ) for ind_t in tqdm(range(image.shape[0]), desc="Local normalization")]
-        )
-    else:
-        # Apply local normalization to the image
-        image_norm = local_normalization(image, box_size=box_size, 
-                                         perc_low=perc_low, perc_high=perc_high)
-        
-    return image_norm
-
-def make_array_isotropic(image, voxel_scale=None, zoom_factors=None, order=1, n_jobs=-1):
+def make_array_isotropic(
+    image: np.ndarray,
+    zoom_factors: Tuple[float, float, float],
+    order: int = 1,
+    n_jobs: int = -1,
+) -> np.ndarray:
     """
     Resizes an input image to have isotropic voxel dimensions.
 
     Parameters:
     - image: numpy array, input image
-    - voxel_scale: tuple or list, voxel size (e.g in um for each dimension)
-    - order: int, order of interpolation for resizing (defaults to 1 for 
-      linear interpolation). Choose 0 for nearest-neighbor interpolation 
-      (e.g. for label images)  
+    - zoom_factors: tuple of floats, zoom factors for each dimension
+    - order: int, order of interpolation for resizing (defaults to 1 for
+      linear interpolation). Choose 0 for nearest-neighbor interpolation
+      (e.g. for label images)
     - n_jobs: int, optional number of parallel jobs for resizing (default: -1)
 
     Returns:
@@ -80,32 +49,34 @@ def make_array_isotropic(image, voxel_scale=None, zoom_factors=None, order=1, n_
     """
 
     is_temporal = image.ndim == 4
-    
-    if voxel_scale is not None:
-        zoom_factors = np.array(voxel_scale)
-    elif zoom_factors is not None:
-        zoom_factors = np.array(zoom_factors)
-    else:
-        raise ValueError("Either voxel_scale or zoom_factors must be provided.")
 
     if is_temporal:
-        
+
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_image = np.array(
-                [zoom(image[ind_t], zoom_factors, order=order) \
-                 for ind_t in tqdm(range(image.shape[0]), desc="Making array isotropic")]
+                [
+                    zoom(image[ind_t], zoom_factors, order=order)
+                    for ind_t in tqdm(
+                        range(image.shape[0]), desc="Making array isotropic"
+                    )
+                ]
             )
-        
+
         else:
             # Parallel resizing of each time frame using multiple processes
             func_parallel = partial(zoom, zoom=zoom_factors, order=order)
 
-            max_workers = cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
 
             resized_image = np.array(
                 process_map(
-                    func_parallel, image, max_workers=max_workers, desc="Making array isotropic"
+                    func_parallel,
+                    image,
+                    max_workers=max_workers,
+                    desc="Making array isotropic",
                 )
             )
 
@@ -116,145 +87,26 @@ def make_array_isotropic(image, voxel_scale=None, zoom_factors=None, order=1, n_
     return resized_image
 
 
-def compute_mask_OLD(image, sigma_blur, threshold=None, n_jobs=-1):
+def compute_mask(
+    image: np.ndarray,
+    method: str,
+    sigma_blur: float,
+    threshold_factor: float = 1,
+    compute_convex_hull: bool = False,
+    n_jobs: int = -1,
+) -> np.ndarray:
     """
-    Computes a binary mask from an input image using Gaussian smoothing and thresholding.
+    Compute the mask for the given image using the specified method.
 
     Parameters:
     - image: numpy array, input image
-    - sigma_blur: float, standard deviation for Gaussian smoothing
-    - threshold: float, optional threshold value for binarization (default: None)
-    - n_jobs: int, optional number of parallel jobs for smoothing (default: -1)
-
-    Returns:
-    - mask: numpy array, binary mask computed from the input image
-    """
-
-    is_temporal = image.ndim == 4
-
-    # Apply Gaussian smoothing to the image
-    blurred = gaussian_smooth(
-        image, 
-        sigmas=sigma_blur,
-        n_jobs=n_jobs,
-    )
-
-    if is_temporal:
-        # If the image is temporal, apply thresholding to each time frame
-        mask = np.zeros_like(blurred, dtype=bool)
-        for ind_t in tqdm(range(image.shape[0]), desc="Thresholding image"):
-
-            blurred_stack = blurred[ind_t]
-
-            if threshold is None:
-                # Compute the threshold using Otsu's method
-                threshold = 0.6 * threshold_otsu(blurred_stack)
-
-            mask[ind_t] = blurred_stack > threshold
-
-    else:
-        # If the image is not temporal, apply thresholding to the whole image
-        if threshold is None:
-            # Compute the threshold using Otsu's method
-            threshold = 0.6 * threshold_otsu(blurred)
-        
-        mask = blurred > threshold
-
-    return mask
-
-def variance_threshold_binarization(image, box_size):
-    """
-    Perform variance threshold binarization on an input image.
-
-    Parameters:
-    - image: numpy array, input image
-    - box_size: int, size of the local neighborhood for computing variance
-
-    Returns:
-    - binary_mask: numpy array, binary mask computed using variance thresholding
-    """
-
-    # Compute the variance of the image using a local neighborhood
-    variance1 = uniform_filter(image, box_size)**2
-    variance2 = uniform_filter(image**2, box_size)
-    sigma = np.sqrt(variance2 - variance1)
-
-    # Compute the histogram of the variance values
-    freqs, bins = np.histogram(sigma.ravel(), bins=256)
-
-    # Find the local minima in the histogram
-    # Specifically, it finds weak minima (can be less or equal to the neighboring
-    # points) and choses the lowest excluding the boundaries.
-    threshold_candidates_args = argrelextrema(freqs, np.less_equal, order=1)[0][1:-1]
-
-    # Select the threshold value as the one with the minimum frequency
-    threshold = bins[threshold_candidates_args[np.argmin(freqs[threshold_candidates_args])]]
-
-    # Create a binary mask using the variance threshold
-    binary_mask = sigma > threshold
-
-    return binary_mask
-
-def get_largest_connected_component(array):
-    """
-    Get the largest connected component in a binary array.
-
-    Parameters:
-    - array: Binary array.
-
-    Returns:
-    - mask_largest_cc: Binary mask of the largest connected component.
-    """
-    labels = label(array)
-    mask_largest_cc = labels == np.argmax(np.bincount(labels.flat)[1:])+1
-    return mask_largest_cc
-
-def refine_raw_mask(mask):
-    """
-    Refine the raw mask by keeping only the largest connected component and filling holes.
-
-    Parameters:
-    - mask: numpy array, binary mask
-
-    Returns:
-    - refined_mask: numpy array, refined binary mask
-    """
-    # Keep only the largest connected component
-    mask = get_largest_connected_component(mask)
-    # Fill holes in the mask
-    refined_mask = binary_fill_holes(mask)
-    return refined_mask
-
-def process_mask(im, box_size):
-    """
-    Process the mask for the given image.
-
-    Parameters:
-    - im: numpy array, input image
-    - box_size: int, size of the box for variance calculation. Should typically be 
-        between 1 and 3 times the typical object diameter.
-
-    Returns:
-    - mask: numpy array, binary mask of the same shape as the input image
-    """
-
-    # Compute the mask using variance threshold binarization
-    mask = variance_threshold_binarization(im, box_size)
-
-    # Refine the mask by keeping only the largest connected component and filling holes
-    mask = refine_raw_mask(mask)
-
-    return mask
-
-
-def compute_mask(image, box_size, n_jobs=-1):
-    """
-    Compute the mask for the given image using variance threshold binarization.
-
-    Parameters:
-    - image: numpy array, input image
-    - box_size: int, size of the box for variance calculation. Should typicall be 
-      between and 1 and 3 times the typical object diameter.
+    - method: str, method to use for thresholding. Can be 'snp' for Signal-Noise Product thresholding,
+      'otsu' for Otsu's thresholding, or 'histomin' for Histogram Minimum thresholding.
+    - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
+      around 1/3 of the typical object diameter.
+    - threshold_factor: float, factor to multiply the threshold (default: 1)
+    - compute_convex_hull: bool, set to True to compute the convex hull of the mask. If set to
+      False, a hole-filling operation will be performed instead.
     - n_jobs: int, number of parallel jobs to run (-1 for using all available CPUs)
 
     Returns:
@@ -264,54 +116,115 @@ def compute_mask(image, box_size, n_jobs=-1):
     is_temporal = image.ndim == 4
 
     if is_temporal:
-        # func_parallel = partial(variance_threshold_binarization, box_size=box_size)
-        func_parallel = partial(process_mask, box_size=box_size)
+        func_parallel = partial(
+            _compute_mask,
+            method=method,
+            sigma_blur=sigma_blur,
+            threshold_factor=threshold_factor,
+            compute_convex_hull=compute_convex_hull,
+        )
 
         if n_jobs == 1:
             # Sequential processing
             mask = np.array(
-                [func_parallel(im) for im in tqdm(image, desc="Thresholding image")]
+                [
+                    func_parallel(im)
+                    for im in tqdm(image, desc="Thresholding image")
+                ]
             )
         else:
             # Parallel processing
-            max_workers = cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
 
             mask = np.array(
                 process_map(
-                    func_parallel, image, max_workers=max_workers, desc="Thresholding image"
+                    func_parallel,
+                    image,
+                    max_workers=max_workers,
+                    desc="Thresholding image",
                 )
             )
     else:
         # Single image processing
-        mask = process_mask(image, box_size)
+        mask = _compute_mask(
+            image, method, sigma_blur, threshold_factor, compute_convex_hull
+        )
 
     return mask
 
-def signed_angle(v1, v2, vn):
+
+def local_image_normalization(
+    image: np.ndarray,
+    box_size: int,
+    perc_low: float,
+    perc_high: float,
+    mask: np.ndarray = None,
+    n_jobs: int = -1,
+) -> np.ndarray:
     """
-    Calculate the signed angle between two vectors in 3D space.
+    Performs local image normalization on either a single image or a temporal stack of images.
+    Stretches the image histogram in local neighborhoods by remapping intesities in the range
+    [perc_low, perc_high] to the range [0, 1].
+    This helps to enhance the contrast and improve the visibility of structures in the image.
 
     Parameters:
-    - v1: numpy array, first vector
-    - v2: numpy array, second vector
-    - vn: numpy array, normal vector
+    - image: numpy array, input image or temporal stack of images
+    - box_size: int, size of the local neighborhood for normalization
+    - perc_low: float, lower percentile for intensity normalization
+    - perc_high: float, upper percentile for intensity normalization
+    - mask: numpy array, binary mask used to set the background to zero (optional)
+    - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
     Returns:
-    - angle: float, signed angle between the two vectors
+    - image_norm: numpy array, normalized image or stack of normalized images
     """
 
-    angle = np.arctan2(
-        np.dot(vn, np.cross(v1, v2)),
-        np.dot(v1, v2)
-    )
+    is_temporal = image.ndim == 4
 
-    return angle
+    if is_temporal:
+        # Apply local normalization to each time frame in the temporal stack
+        image_norm = np.array(
+            [
+                _local_normalization(
+                    image[ind_t],
+                    box_size=box_size,
+                    perc_low=perc_low,
+                    perc_high=perc_high,
+                )
+                for ind_t in tqdm(
+                    range(image.shape[0]), desc="Local normalization"
+                )
+            ]
+        )
+    else:
+        # Apply local normalization to the image
+        image_norm = _local_normalization(
+            image, box_size=box_size, perc_low=perc_low, perc_high=perc_high
+        )
 
-        
+    if mask is not None:
+        # Set the background to zero using the mask
+        image_norm = np.where(mask, image_norm, 0.0)
 
-def align_array_major_axis(target_axis: str, rotation_plane: str, 
-                           mask, image=None, labels=None, order=1,
-                           temporal_slice=None, n_jobs=-1):
+    return image_norm
+
+
+def align_array_major_axis(
+    target_axis: str,
+    rotation_plane: str,
+    mask: np.ndarray,
+    image: Optional[np.ndarray] = None,
+    labels: Optional[np.ndarray] = None,
+    order: int = 1,
+    temporal_slice: Optional[int] = None,
+    n_jobs: int = -1,
+) -> Union[
+    np.ndarray,
+    Tuple[np.ndarray, np.ndarray],
+    Tuple[np.ndarray, np.ndarray, np.ndarray],
+]:
     """
     Aligns the major axis of an array to a target axis in a specified rotation plane.
     This function uses Principal Component Analysis (PCA) to determine the major axis of the array,
@@ -344,68 +257,60 @@ def align_array_major_axis(target_axis: str, rotation_plane: str,
 
     is_temporal = mask.ndim == 4
 
-    temporal_slice = slice(None) if temporal_slice is None else temporal_slice
-
-    # Compute the mask that will be used to compute the major axis.
-    # If the mask is a temporal array, the major axis is computed by aggregating the mask
-    # instances in temporal_slice. 
-    mask_for_pca = np.any(mask[temporal_slice], axis=0) if is_temporal else mask
-    
-    # Perform PCA on the mask to determine the major axis
-    pca = PCA(n_components=3)
-    pca.fit(np.argwhere(mask_for_pca))
-    major_axis_vector = pca.components_[0]
-
-    plane_normal_vector = {
-        'XY': np.array([1, 0, 0]),
-        'XZ': np.array([0, 1, 0]),
-        'YZ': np.array([0, 0, 1])
-    }[rotation_plane]
-
-    # Remove the component of the major axis vector that is perpendicular to the rotation plane
-    major_axis_vector -= np.dot(major_axis_vector, plane_normal_vector) * plane_normal_vector
-    major_axis_vector = major_axis_vector / np.linalg.norm(major_axis_vector)
-    major_axis_vector *= np.sign(np.max(major_axis_vector))
-
-    target_axis_vector = {
-        'Z': np.array([1, 0, 0]),
-        'Y': np.array([0, 1, 0]),
-        'X': np.array([0, 0, 1])
-    }[target_axis]
-
-    # Calculate the rotation angle between the major axis and the target axis
-    rotation_angle = signed_angle(major_axis_vector, target_axis_vector, plane_normal_vector) * 180 / np.pi
-
-    rotation_plane_indices = {
-        'XY': (-1, -2), # respects the right-hand rule wrt the corresponding normal vector
-        'XZ': (-3, -1),
-        'YZ': (-2, -3)
-    }[rotation_plane]
+    # Compute the rotation angle and the indices of the rotation plane
+    rotation_angle, rotation_plane_indices = (
+        _compute_rotation_angle_and_indices(
+            mask, target_axis, rotation_plane, temporal_slice
+        )
+    )
 
     # Define the rotation functions
-    func_rotate_image = partial(rotate, angle=rotation_angle, 
-                                axes=rotation_plane_indices, 
-                                reshape=True, order=order)
-    func_rotate = partial(rotate, angle=rotation_angle, 
-                         axes=rotation_plane_indices, 
-                          reshape=True, order=0)
+    func_rotate_image = partial(
+        rotate,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=order,
+    )
+    func_rotate = partial(
+        rotate,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=0,
+    )
 
     if is_temporal and n_jobs != 1:
         # Rotate the arrays in parallel if the array is temporal and parallel execution is enabled
         max_workers = cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
 
         mask_rotated = np.array(
-            process_map(func_rotate, mask, max_workers=max_workers, desc="Aligning mask")
+            process_map(
+                func_rotate,
+                mask,
+                max_workers=max_workers,
+                desc="Aligning mask",
+            )
         )
         if image is not None:
             image_rotated = np.array(
-                process_map(func_rotate_image, image, max_workers=max_workers, desc="Aligning image")
+                process_map(
+                    func_rotate_image,
+                    image,
+                    max_workers=max_workers,
+                    desc="Aligning image",
+                )
             )
         if labels is not None:
             labels_rotated = np.array(
-                process_map(func_rotate, labels, max_workers=max_workers, desc="Aligning labels")
+                process_map(
+                    func_rotate,
+                    labels,
+                    max_workers=max_workers,
+                    desc="Aligning labels",
+                )
             )
-        
+
     else:
         # Rotate the arrays in block
         mask_rotated = func_rotate(mask)
@@ -424,21 +329,33 @@ def align_array_major_axis(target_axis: str, rotation_plane: str,
         return mask_rotated
 
 
-def crop_array_using_mask(array, mask, margin=0):
+def crop_array_using_mask(
+    mask: np.ndarray,
+    image: Optional[np.ndarray] = None,
+    labels: Optional[np.ndarray] = None,
+    margin: int = 0,
+    n_jobs: int = -1,
+) -> Union[
+    np.ndarray,
+    Tuple[np.ndarray, np.ndarray],
+    Tuple[np.ndarray, np.ndarray, np.ndarray],
+]:
     """
     Crop an array using a binary mask. If the array is temporal, the cropping
-    slice is computed by aggregating mask instances at all times. 
+    slice is computed by aggregating mask instances at all times.
 
     Parameters:
-    - array: numpy array, input array to be cropped
     - mask: numpy array, binary mask indicating the region of interest
+    - image: numpy array, input image or temporal stack of images (optional)
+    - labels: numpy array, labels corresponding to the mask (optional)
     - margin: int, optional margin to add around the mask (default: 0)
+    - n_jobs: int, number of parallel jobs to use (not used currently as the function is not computationally intensive)
 
     Returns:
     - cropped_array: numpy array, cropped array based on the mask
     """
 
-    is_temporal = array.ndim == 4
+    is_temporal = mask.ndim == 4
 
     # Compute aggregated mask if array is temporal
     mask_for_slice = np.any(mask, axis=0) if is_temporal else mask
@@ -451,13 +368,25 @@ def crop_array_using_mask(array, mask, margin=0):
         mask_slice = tuple(
             slice(
                 max(0, mask_slice[i].start - margin),
-                min(mask_slice[i].stop + margin, array.shape[i])
-            ) for i in range(3)
+                min(mask_slice[i].stop + margin, mask.shape[i + 1]),
+            )
+            for i in range(3)
         )
-    
-    mask_slice = (slice(None),) + mask_slice if is_temporal else mask_slice
-    # Apply the slice to the array
-    array_cropped = array[mask_slice]
-    mask_cropped = mask[mask_slice]
 
-    return array_cropped, mask_cropped
+    mask_slice = (slice(None),) + mask_slice if is_temporal else mask_slice
+
+    # Apply the slice to the arrays
+    mask_cropped = mask[mask_slice]
+    if image is not None:
+        image_cropped = image[mask_slice]
+    if labels is not None:
+        labels_cropped = labels[mask_slice]
+
+    if image is not None and labels is not None:
+        return mask_cropped, image_cropped, labels_cropped
+    elif image is not None:
+        return mask_cropped, image_cropped
+    elif labels is not None:
+        return mask_cropped, labels_cropped
+    else:
+        return mask_cropped
