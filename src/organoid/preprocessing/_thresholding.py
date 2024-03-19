@@ -162,7 +162,7 @@ def _compute_mask_convex_hull(
         # Rescale the mask if precision_factor is not 1
         hull_mask = rescale(
             hull_mask,
-            precision_factor,
+            1/precision_factor,
             anti_aliasing=False,
             order=0,
             preserve_range=True,
@@ -231,7 +231,7 @@ def _refine_raw_mask(
     refined_mask = _get_largest_connected_component(mask)
     # Fill holes in the mask
     if compute_convex_hull:
-        refined_mask = _compute_mask_convex_hull(refined_mask, 2)
+        refined_mask = _compute_mask_convex_hull(refined_mask, 3)
     else:
         refined_mask = binary_fill_holes(refined_mask)
         refined_mask = _binary_fill_holes_on_each_slice(refined_mask)
@@ -254,7 +254,7 @@ def _compute_mask(
 
     Parameters:
     - image: numpy array, input image
-    - method: str, method to use for thresholding. Can be 'snp' for Signal-Noise Product thresholding,
+    - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
       'otsu' for Otsu's thresholding, or 'histomin' for Histogram Minimum thresholding.
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
@@ -272,7 +272,7 @@ def _compute_mask(
     im = np.clip(im, 0, 1).astype(np.float32)
 
     # Compute the mask
-    if method == "snp":
+    if method == "snp otsu":
         mask = _snp_threshold_binarization(
             im / im.max(), sigma_blur, threshold_factor
         )
