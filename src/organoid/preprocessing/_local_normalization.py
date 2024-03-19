@@ -293,7 +293,9 @@ class interp3d(object):
 
 
 def _local_normalization(
-    image: np.ndarray, box_size: int, perc_low: float, perc_high: float
+    image: np.ndarray, box_size: int, 
+    perc_low: float, perc_high: float,
+    mask: np.ndarray = None
 ) -> np.ndarray:
     """
     Performs local histogram stretching by applying the following steps:
@@ -312,6 +314,8 @@ def _local_normalization(
         percentile value to use as the low value of the normalization (will be mapped to 0).
     perc_high : float
         percentile value to use as the high value of the normalization (will be mapped to 1).
+    mask : np.ndarray
+        An optional mask boolean array from which background values will be excluded from the computation.
 
     Returns
     -------
@@ -348,7 +352,12 @@ def _local_normalization(
             stop = min(max(index + box_size + 1, box_length), s)
             slices.append(slice(start, stop))
 
-        box = image[tuple(slices)]
+        box = image[tuple(slices)].copy()
+
+        if mask is not None:
+            box = box[mask[tuple(slices)]]
+            if box.size == 0:
+                continue
 
         val_low, val_high = np.percentile(box, [perc_low, perc_high])
 
