@@ -7,14 +7,14 @@ from organoid.preprocessing._labels_masking import (
 
 
 def remove_labels_outside_of_mask(
-    labels: np.ndarray, mask: np.ndarray, n_jobs: int = -1
+    mask: np.ndarray, labels: np.ndarray, n_jobs: int = -1
 ) -> np.ndarray:
     """
     Removes labels outside (or at the border) of the mask.
 
     Parameters:
-    - labels (ndarray): The segmentation labels.
     - mask (ndarray): The mask indicating the valid region.
+    - labels (ndarray): The segmentation labels.
     - n_jobs (int): The number of parallel jobs to run. If -1, use all available CPUs.
 
     Returns:
