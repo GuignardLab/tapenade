@@ -56,9 +56,9 @@ def make_array_isotropic(
             # Sequential resizing of each time frame
             resized_image = np.array(
                 [
-                    zoom(image[ind_t], zoom_factors, order=order)
-                    for ind_t in tqdm(
-                        range(image.shape[0]), desc="Making array isotropic"
+                    zoom(im, zoom_factors, order=order)
+                    for im in tqdm(
+                        image, desc="Making array isotropic",
                     )
                 ]
             )
@@ -296,6 +296,7 @@ def align_array_major_axis(
                 mask,
                 max_workers=max_workers,
                 desc="Aligning mask",
+                
             )
         )
         if image is not None:
