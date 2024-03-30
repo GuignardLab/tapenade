@@ -280,7 +280,7 @@ def _compute_mask(
         mask = _otsu_threshold_binarization(
             im / im.max(), sigma_blur, threshold_factor
         )
-    elif method == "histomin":
+    elif method == "histogram min":
         mask = _histomin_threshold_binarization(
             im / im.max(), sigma_blur, threshold_factor
         )
