@@ -124,6 +124,7 @@ def make_array_isotropic(
                     zip(mask, image, labels),
                     max_workers=max_workers,
                     desc="Making array isotropic",
+                    total=n_frames,
                 )
             )
 
