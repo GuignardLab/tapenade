@@ -8,11 +8,18 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from typing import Optional, Tuple, Union
 
+from organoid.preprocessing._isotropize import _make_array_isotropic
 from organoid.preprocessing._local_normalization import _local_normalization
 from organoid.preprocessing._thresholding import _compute_mask
 from organoid.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
+
+"""
+#! TODO:
+    - refactor every multiprocessing calls through a single decorator 
+    - update notebook to reflect changes
+"""
 
 """
 In typical order:
@@ -27,9 +34,22 @@ In typical order:
 """
 
 
+def _parallel_make_array_isotropic(arrays, zoom_factors, order):
+    mask, image, labels = arrays
+    return _make_array_isotropic(
+        mask=mask,
+        image=image,
+        labels=labels,
+        zoom_factors=zoom_factors,
+        order=order,
+    )
+
+
 def make_array_isotropic(
-    image: np.ndarray,
-    zoom_factors: Tuple[float, float, float],
+    mask: np.ndarray = None,
+    image: np.ndarray = None,
+    labels: np.ndarray = None,
+    zoom_factors: Tuple[float, float, float] = (1, 1, 1),
     order: int = 1,
     n_jobs: int = -1,
 ) -> np.ndarray:
@@ -37,7 +57,9 @@ def make_array_isotropic(
     Resizes an input image to have isotropic voxel dimensions.
 
     Parameters:
+    - mask: numpy array, input mask
     - image: numpy array, input image
+    - labels: numpy array, input labels
     - zoom_factors: tuple of floats, zoom factors for each dimension
     - order: int, order of interpolation for resizing (defaults to 1 for
       linear interpolation). Choose 0 for nearest-neighbor interpolation
@@ -48,33 +70,58 @@ def make_array_isotropic(
     - resized_image: numpy array, resized image with isotropic voxel dimensions
     """
 
-    is_temporal = image.ndim == 4
+    is_temporal = False
+    n_frames = 0
+    for arr in [mask, image, labels]:
+        if arr is not None:
+            is_temporal = arr.ndim == 4
+            if is_temporal:
+                n_frames = arr.shape[0]
+            break
+
+    mask_not_None = True
+    image_not_None = True
+    labels_not_None = True
+
+    if mask is None:
+        mask = [None] * n_frames
+        mask_not_None = False
+    if image is None:
+        image = [None] * n_frames
+        image_not_None = False
+    if labels is None:
+        labels = [None] * n_frames
+        labels_not_None = False
 
     if is_temporal:
 
         if n_jobs == 1:
             # Sequential resizing of each time frame
-            resized_image = np.array(
-                [
-                    zoom(im, zoom_factors, order=order)
-                    for im in tqdm(
-                        image, desc="Making array isotropic",
-                    )
-                ]
-            )
+            resized_arrays = [
+                _make_array_isotropic(ma, im, labs, zoom_factors, order=order)
+                for ma, im, labs in tqdm(
+                    zip(mask, image, labels),
+                    desc="Making array isotropic",
+                    total=n_frames,
+                )
+            ]
 
         else:
             # Parallel resizing of each time frame using multiple processes
-            func_parallel = partial(zoom, zoom=zoom_factors, order=order)
+            func_parallel = partial(
+                _parallel_make_array_isotropic,
+                zoom_factors=zoom_factors,
+                order=order,
+            )
 
             max_workers = (
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            resized_image = np.array(
+            resized_arrays = np.array(
                 process_map(
                     func_parallel,
-                    image,
+                    zip(mask, image, labels),
                     max_workers=max_workers,
                     desc="Making array isotropic",
                 )
@@ -82,9 +129,15 @@ def make_array_isotropic(
 
     else:
         # Resizing the whole image
-        resized_image = zoom(image, zoom_factors, order=order)
+        resized_arrays = _make_array_isotropic(
+            mask, image, labels, zoom_factors=zoom_factors, order=order
+        )
 
-    return resized_image
+    if sum([mask_not_None, image_not_None, labels_not_None]) > 1:
+        resized_arrays = tuple(map(np.array, zip(*resized_arrays)))
+        return resized_arrays
+    else:
+        return np.array(resized_arrays)
 
 
 def compute_mask(
@@ -100,8 +153,8 @@ def compute_mask(
 
     Parameters:
     - image: numpy array, input image
-    - method: str, method to use for thresholding. Can be 'snp' for Signal-Noise Product thresholding,
-      'otsu' for Otsu's thresholding, or 'histomin' for Histogram Minimum thresholding.
+    - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
+      'otsu' for Otsu's thresholding, or 'histogram min' for Histogram Minimum thresholding.
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold (default: 1)
@@ -195,7 +248,7 @@ def local_image_normalization(
                     box_size=box_size,
                     perc_low=perc_low,
                     perc_high=perc_high,
-                    mask=mask[ind_t]
+                    mask=mask[ind_t],
                 )
                 for ind_t in tqdm(
                     range(image.shape[0]), desc="Local normalization"
@@ -205,9 +258,11 @@ def local_image_normalization(
     else:
         # Apply local normalization to the image
         image_norm = _local_normalization(
-            image, box_size=box_size,
-            perc_low=perc_low, perc_high=perc_high,
-            mask=mask
+            image,
+            box_size=box_size,
+            perc_low=perc_low,
+            perc_high=perc_high,
+            mask=mask,
         )
 
     if mask is not None:
@@ -296,7 +351,6 @@ def align_array_major_axis(
                 mask,
                 max_workers=max_workers,
                 desc="Aligning mask",
-                
             )
         )
         if image is not None:
