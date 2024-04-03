@@ -83,18 +83,17 @@ def make_array_isotropic(
     image_not_None = True
     labels_not_None = True
 
+    if mask is None:
+        mask = [None] * n_frames if is_temporal else None
+        mask_not_None = False
+    if image is None:
+        image = [None] * n_frames if is_temporal else None
+        image_not_None = False
+    if labels is None:
+        labels = [None] * n_frames if is_temporal else None
+        labels_not_None = False
+
     if is_temporal:
-
-        if mask is None:
-            mask = [None] * n_frames
-            mask_not_None = False
-        if image is None:
-            image = [None] * n_frames
-            image_not_None = False
-        if labels is None:
-            labels = [None] * n_frames
-            labels_not_None = False
-
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_arrays = [
