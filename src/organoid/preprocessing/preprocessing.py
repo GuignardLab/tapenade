@@ -83,17 +83,17 @@ def make_array_isotropic(
     image_not_None = True
     labels_not_None = True
 
-    if mask is None:
-        mask = [None] * n_frames
-        mask_not_None = False
-    if image is None:
-        image = [None] * n_frames
-        image_not_None = False
-    if labels is None:
-        labels = [None] * n_frames
-        labels_not_None = False
-
     if is_temporal:
+
+        if mask is None:
+            mask = [None] * n_frames
+            mask_not_None = False
+        if image is None:
+            image = [None] * n_frames
+            image_not_None = False
+        if labels is None:
+            labels = [None] * n_frames
+            labels_not_None = False
 
         if n_jobs == 1:
             # Sequential resizing of each time frame
@@ -118,14 +118,12 @@ def make_array_isotropic(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            resized_arrays = np.array(
-                process_map(
-                    func_parallel,
-                    zip(mask, image, labels),
-                    max_workers=max_workers,
-                    desc="Making array isotropic",
-                    total=n_frames,
-                )
+            resized_arrays = process_map(
+                func_parallel,
+                zip(mask, image, labels),
+                max_workers=max_workers,
+                desc="Making array isotropic",
+                total=n_frames,
             )
 
     else:
