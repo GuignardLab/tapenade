@@ -2,7 +2,7 @@ import numpy as np
 
 from functools import partial
 from os import cpu_count
-from scipy.ndimage import zoom, rotate
+from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
@@ -34,13 +34,13 @@ In typical order:
 """
 
 
-def _parallel_make_array_isotropic(arrays, zoom_factors, order):
+def _parallel_make_array_isotropic(arrays, reshape_factors, order):
     mask, image, labels = arrays
     return _make_array_isotropic(
         mask=mask,
         image=image,
         labels=labels,
-        zoom_factors=zoom_factors,
+        reshape_factors=reshape_factors,
         order=order,
     )
 
@@ -49,7 +49,7 @@ def make_array_isotropic(
     mask: np.ndarray = None,
     image: np.ndarray = None,
     labels: np.ndarray = None,
-    zoom_factors: Tuple[float, float, float] = (1, 1, 1),
+    reshape_factors: Tuple[float, float, float] = (1, 1, 1),
     order: int = 1,
     n_jobs: int = -1,
 ) -> np.ndarray:
@@ -60,7 +60,7 @@ def make_array_isotropic(
     - mask: numpy array, input mask
     - image: numpy array, input image
     - labels: numpy array, input labels
-    - zoom_factors: tuple of floats, zoom factors for each dimension
+    - reshape_factors: tuple of floats, reshape factors for each dimension
     - order: int, order of interpolation for resizing (defaults to 1 for
       linear interpolation). Choose 0 for nearest-neighbor interpolation
       (e.g. for label images)
@@ -97,7 +97,7 @@ def make_array_isotropic(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_arrays = [
-                _make_array_isotropic(ma, im, labs, zoom_factors, order=order)
+                _make_array_isotropic(ma, im, labs, reshape_factors, order=order)
                 for ma, im, labs in tqdm(
                     zip(mask, image, labels),
                     desc="Making array isotropic",
@@ -109,7 +109,7 @@ def make_array_isotropic(
             # Parallel resizing of each time frame using multiple processes
             func_parallel = partial(
                 _parallel_make_array_isotropic,
-                zoom_factors=zoom_factors,
+                reshape_factors=reshape_factors,
                 order=order,
             )
 
@@ -128,7 +128,7 @@ def make_array_isotropic(
     else:
         # Resizing the whole image
         resized_arrays = _make_array_isotropic(
-            mask, image, labels, zoom_factors=zoom_factors, order=order
+            mask, image, labels, reshape_factors=reshape_factors, order=order
         )
 
     if sum([mask_not_None, image_not_None, labels_not_None]) > 1:
