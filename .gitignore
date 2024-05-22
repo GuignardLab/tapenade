@@ -82,3 +82,9 @@ venv/
 
 # written by setuptools_scm
 **/_version.py
+
+
+#tests alice
+notebooks/registration_notebook_Alice.ipynb
+notebooks/registration_notebook_Alice_Pulsedata.ipynb
+notebooks/registration_test_dtype.ipynb

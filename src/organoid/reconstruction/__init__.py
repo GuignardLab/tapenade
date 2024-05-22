@@ -5,6 +5,7 @@ from ._reconstruct import (
     create_folders,
     extract_positions,
     fuse_sides,
+    transformation_from_plugin,
     manual_registration_fct,
     plot_positions,
     register,
@@ -17,6 +18,7 @@ __all__ = (
     "extract_positions",
     "plot_positions",
     "associate_top_bottom",
+    "transformation_from_plugin"
     "manual_registration_fct",
     "register",
     "create_folders",

@@ -145,3 +145,16 @@ def smooth_gaussian(array, sigma, scale: tuple, mask=None, mask_for_volume=None,
             return smooth_array, effective_volume, smooth_array_copy
         else:
             return smooth_array
+
+def normalize_by_reference_signal(signal, reference, mask=None,scale:tuple=(1,1,1)):
+    """
+    Normalize the signal by the reference signal.
+    """
+    if mask is None:
+        mask = np.ones_like(signal, dtype=bool)
+
+    ref_smooth = smooth_gaussian(reference,sigma=10,scale=scale, mask=mask)
+    ref_smooth[mask==0]=np.nan
+    signal_norm = signal/ref_smooth
+    signal_norm[mask==0]=0
+    return(signal)
