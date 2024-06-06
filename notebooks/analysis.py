@@ -8,14 +8,16 @@ from pathlib import Path
 from glob import glob
 import numpy as np
 from organoid import analysis
+import os
 
 #Reading all the data in one folder
 folder_data = ...
 samples = []
-paths = sorted(glob(Path(folder_data) / "*.tif"))
 
-for path in paths :
-    samples.append(Path(path).stem)
+for name in os.listdir(folder_data):
+    if name.endswith('.tif'):
+        samples.append(name.split('.')[0])
+
 print('list of the samples :',samples)
 
 scale = (1,1,1)

@@ -20,6 +20,7 @@ def predict_stardist(
     array,
     model_path: str,
     input_voxelsize: tuple = (1, 1, 1),
+    voxelsize_model:tuple=(0.7,0.7,0.7),
     normalize_input: bool = True,
 ):
     """
@@ -36,7 +37,7 @@ def predict_stardist(
     model = StarDist3D(None, name=model_name, basedir=directory)
 
     data = change_voxelsize(
-        array, input_vs=input_voxelsize, output_vs=(0.7, 0.7, 0.7), order=1
+        array, input_vs=input_voxelsize, output_vs=voxelsize_model, order=1
     )
     if normalize_input:
         data = normalize(data, 1, 99)
@@ -44,7 +45,7 @@ def predict_stardist(
         data, axes="ZYX", n_tiles=model._guess_n_tiles(data)
     )
     aniso_labels = change_voxelsize(
-        labels, input_vs=(0.7, 0.7, 0.7), output_vs=input_voxelsize, order=0
+        labels, input_vs=voxelsize_model, output_vs=input_voxelsize, order=0
     )
 
     return np.asarray(aniso_labels).astype(np.int16)
