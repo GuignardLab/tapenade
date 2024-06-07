@@ -139,7 +139,7 @@ class SpatialCorrelationPlotter:
             extent_X, extent_Y
         )
 
-        return fig, ax, sample_indices
+        return fig, ax
     
     def _get_custom_cmap(self, colormap: str):
         # changing colormap to get white for 0 values 
