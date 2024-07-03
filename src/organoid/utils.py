@@ -63,8 +63,8 @@ def filter_percentiles(X, percentilesX: tuple = (1, 99), Y = None, percentilesY:
         percentile_upX = np.percentile(X, upX)
         percentile_upY = np.percentile(Y, upY)
 
-        maskX = np.logical_and(X>percentile_downX, X<percentile_upX)
-        maskY = np.logical_and(Y>percentile_downY, Y<percentile_upY)
+        maskX = np.logical_and(X>=percentile_downX, X<=percentile_upX)
+        maskY = np.logical_and(Y>=percentile_downY, Y<=percentile_upY)
 
         mask = np.logical_and(maskX, maskY)
 
