@@ -144,6 +144,7 @@ def compute_mask(
     sigma_blur: float,
     threshold_factor: float = 1,
     compute_convex_hull: bool = False,
+    registered_image: bool = False,
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
@@ -173,6 +174,7 @@ def compute_mask(
             sigma_blur=sigma_blur,
             threshold_factor=threshold_factor,
             compute_convex_hull=compute_convex_hull,
+            registered_image=registered_image,
         )
 
         if n_jobs == 1:
@@ -200,7 +202,7 @@ def compute_mask(
     else:
         # Single image processing
         mask = _compute_mask(
-            image, method, sigma_blur, threshold_factor, compute_convex_hull
+            image, method, sigma_blur, threshold_factor, compute_convex_hull, registered_image
         )
 
     return mask
