@@ -236,9 +236,11 @@ def local_image_normalization(
 
     is_temporal = image.ndim == 4
 
+    mask_is_None = mask is None
+
     if is_temporal:
-        if mask is None:
-            mask_ = [None] * image.shape[0]
+        if mask_is_None:
+            mask = [None] * image.shape[0]
 
         # Apply local normalization to each time frame in the temporal stack
         image_norm = np.array(
@@ -248,7 +250,7 @@ def local_image_normalization(
                     box_size=box_size,
                     perc_low=perc_low,
                     perc_high=perc_high,
-                    mask=mask_[ind_t],
+                    mask=mask[ind_t],
                 )
                 for ind_t in tqdm(
                     range(image.shape[0]), desc="Local normalization"
@@ -265,7 +267,7 @@ def local_image_normalization(
             mask=mask,
         )
 
-    if mask is not None:
+    if not mask_is_None:
         # Set the background to zero using the mask
         image_norm = np.where(mask, image_norm, 0.0)
 
