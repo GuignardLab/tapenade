@@ -144,6 +144,7 @@ def compute_mask(
     sigma_blur: float,
     threshold_factor: float = 1,
     compute_convex_hull: bool = False,
+    registered_image: bool = False,
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
@@ -173,6 +174,7 @@ def compute_mask(
             sigma_blur=sigma_blur,
             threshold_factor=threshold_factor,
             compute_convex_hull=compute_convex_hull,
+            registered_image=registered_image,
         )
 
         if n_jobs == 1:
@@ -200,7 +202,7 @@ def compute_mask(
     else:
         # Single image processing
         mask = _compute_mask(
-            image, method, sigma_blur, threshold_factor, compute_convex_hull
+            image, method, sigma_blur, threshold_factor, compute_convex_hull, registered_image
         )
 
     return mask
@@ -234,8 +236,10 @@ def local_image_normalization(
 
     is_temporal = image.ndim == 4
 
+    mask_is_None = mask is None
+
     if is_temporal:
-        if mask is None:
+        if mask_is_None:
             mask = [None] * image.shape[0]
 
         # Apply local normalization to each time frame in the temporal stack
@@ -263,7 +267,7 @@ def local_image_normalization(
             mask=mask,
         )
 
-    if mask is not None:
+    if not mask_is_None:
         # Set the background to zero using the mask
         image_norm = np.where(mask, image_norm, 0.0)
 
