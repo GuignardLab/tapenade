@@ -160,7 +160,7 @@ def create_folders(
                 imfloat.astype(np.float32),
             )  # ,imagej=True, metadata={'axes': 'TZYX'})>
 
-def transformation_from_plugin(path_json: str):
+def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
     """
     Extract the transformation from the json file saved by the plugin
     Parameters
@@ -176,9 +176,9 @@ def transformation_from_plugin(path_json: str):
     trans_z = data["trans_z"]
     trans_y = data["trans_y"]
     trans_x = data["trans_x"]
-    rotation = [rot_x, rot_y, rot_z]
-    translation = [trans_z, trans_y, trans_x]
-    return (rotation,translation)
+    #in the napari plugin, the translation computed is the one after the rotation, so we need to set the translation trans1 before rotation to 0
+    init_trsfs = list_init_trsf(trans1=[0, 0, 0], trans2=[trans_z, trans_y, trans_x], rot=[rot_x, rot_y, rot_z], scale=scale)
+    return (init_trsfs)
 
 
 def manual_registration_fct(
@@ -266,7 +266,43 @@ def manual_registration_fct(
     translation2 = centermass_ref - center_image
     return (rotation_angles, translation1, translation2)
 
-
+def list_init_trsf(trans1,trans2,rot,scale=[1,1,1]):
+    # trans1_in_um=np.multiply(trans1,scale)
+    # trans2_in_um=np.multiply(trans2,scale)
+    trans2_in_um=trans2
+    trans1_in_um=trans1
+    init_trsf = [
+            [
+                "trans",
+                "X",
+                -trans1_in_um[2],
+                "trans",
+                "Y",
+                -trans1_in_um[1],
+                "trans",
+                "Z",
+                -trans1_in_um[0],
+                "rot",
+                "X",
+                -rot[0],
+                "rot",
+                "Y",
+                -rot[1],
+                "rot",
+                "Z",
+                -rot[2],
+                "trans",
+                "X",
+                -trans2_in_um[2],
+                "trans",
+                "Y",
+                -trans2_in_um[1],
+                "trans",
+                "Z",
+                -trans2_in_um[0],
+            ]
+        ]
+    return(init_trsf)
 def register(
     path_data: str,
     path_transformation: str,
@@ -280,6 +316,7 @@ def register(
     rot: list = None,
     trans2: list = None,
     other_trsf: list = None,
+    input_init_trsf_from_plugin: str = "",
     test_init: int = 0,
     trsf_type: str = "rigid",
     depth: int = 3,
@@ -324,6 +361,10 @@ def register(
     #     IMPORTANT : Needs 2 sets of brackets.
     #     If order_init_trsfs is True, the transformations will be applied in the order they are given in the list init_trsfs.
     #     # Example : [['flip', 'Z', 'trans', 'Z', -10,'trans','Y',100,'rot','X',-29,'rot','Y',41,'rot','Z',-2]]
+    # input_init_trsf_from_plugin : str, optional
+    #     path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file.
+    # test_init : int, optional
+    #     1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0. 
     # trsf_type : str, optional
     #     type of transformation to compute : rigid, affine. By default rigid.
     # depth : int, optional
@@ -343,43 +384,17 @@ def register(
     if trans2 is None:
         trans2 = [0, 0, 0]
 
-    if (
-        other_trsf is not None
-    ):  # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
+    if input_init_trsf_from_plugin != "":
+    #if the user input the json file from the plugin, the json file is used as init trsf no matter the parameters rot, trans1, trans 2 or other_trsf
+        init_trsfs=transformation_from_plugin(input_init_trsf_from_plugin,scale=input_voxel)
+        print('here')
+    elif input_init_trsf_from_plugin == "" and other_trsf is not None:
+        print('other_trsf',other_trsf)
+    # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
         init_trsfs = other_trsf
-    else:  # is the user did not precise other_trsf, then we use the parameters rot, trans1 and trans2 to "build" init_trsfs.
-
-        init_trsfs = [
-            [
-                "trans",
-                "X",
-                -trans1[2],
-                "trans",
-                "Y",
-                -trans1[1],
-                "trans",
-                "Z",
-                -trans1[0],
-                "rot",
-                "X",
-                -rot[0],
-                "rot",
-                "Y",
-                -rot[1],
-                "rot",
-                "Z",
-                -rot[2],
-                "trans",
-                "X",
-                -trans2[2],
-                "trans",
-                "Y",
-                -trans2[1],
-                "trans",
-                "Z",
-                -trans2[0],
-            ]
-        ]
+    else:  # is the user did not precise other_trsf or any json file, then we use the parameters rot, trans1 and trans2 to "build" init_trsfs.
+        print('there')
+        init_trsfs = list_init_trsf(trans1=trans1,trans2=trans2,rot=rot,scale=input_voxel)
     data = {
         "path_to_data": str(path_data),
         "ref_im": reference_image,
