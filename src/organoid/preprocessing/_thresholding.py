@@ -8,10 +8,12 @@ from skimage.measure import label
 from skimage.morphology import convex_hull_image
 from skimage.transform import resize, rescale
 from organoid.preprocessing._smoothing import _smooth_gaussian
+from time import time
 
 
 def _snp_threshold_binarization(
-    image: np.ndarray, sigma_blur: float, threshold_factor: float
+    image: np.ndarray, sigma_blur: float, threshold_factor: float, 
+    registered_image: bool = False
 ) -> np.ndarray:
     """
     Threshold image based on signal-and-noise product.
@@ -20,15 +22,20 @@ def _snp_threshold_binarization(
     - image: numpy array, input image
     - sigma_blur: float, standard deviation of the Gaussian blur.
     - threshold_factor: float, factor to multiply the threshold
+    - registered_image: bool, set to True if the image has been registered beforehand
+      and thus contains large regions of zeros that lead to sharp intensity gradients
+      at the boundaries.
 
     Returns:
     - binary_mask: numpy array, binary mask computed using SNP thresholding
     """
 
-    nonzero_mask = image > 0
 
-    if np.any(nonzero_mask):
+    if registered_image:
+        nonzero_mask = image > 0
+
         blurred = _smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
+        
         blurred2 = _smooth_gaussian(
             image**2, mask=nonzero_mask, sigmas=sigma_blur
         )
@@ -37,7 +44,6 @@ def _snp_threshold_binarization(
 
         snp_array = sigma * blurred
         snp_mask = snp_array > 0
-        # snp_array = np.log(snp_array, where=(snp_array != 0))
 
         snp_array = np.log(
             snp_array, where=np.logical_and(nonzero_mask, snp_mask)
@@ -57,7 +63,6 @@ def _snp_threshold_binarization(
     threshold = threshold_otsu(snp_array[snp_mask]) * threshold_factor
 
     # Create a binary mask
-    # binary_mask = snp_array > threshold
     binary_mask = np.logical_and(snp_array > threshold, snp_mask)
 
     return binary_mask
@@ -198,18 +203,18 @@ def _binary_fill_holes_on_each_slice(mask: np.ndarray) -> np.ndarray:
 
     filled_mask = mask.copy()
 
+    for i in range(filled_mask.shape[2]):
+        filled_mask[:, :, i] = binary_fill_holes(filled_mask[:, :, i])
+    for i in range(filled_mask.shape[1]):
+        filled_mask[:, i] = binary_fill_holes(filled_mask[:, i])
     for i in range(mask.shape[0]):
         filled_mask[i] = binary_fill_holes(filled_mask[i])
-    for i in range(filled_mask.shape[1]):
-        filled_mask[:, i] = binary_fill_holes(filled_mask[:, i])
-    for i in range(filled_mask.shape[2]):
-        filled_mask[:, :, i] = binary_fill_holes(filled_mask[:, :, i])
-    for i in range(filled_mask.shape[0]):
-        filled_mask[i] = binary_fill_holes(filled_mask[i])
-    for i in range(filled_mask.shape[1]):
-        filled_mask[:, i] = binary_fill_holes(filled_mask[:, i])
-    for i in range(filled_mask.shape[2]):
-        filled_mask[:, :, i] = binary_fill_holes(filled_mask[:, :, i])
+    # for i in range(filled_mask.shape[0]):
+    #     filled_mask[i] = binary_fill_holes(filled_mask[i])
+    # for i in range(filled_mask.shape[1]):
+    #     filled_mask[:, i] = binary_fill_holes(filled_mask[:, i])
+    # for i in range(filled_mask.shape[2]):
+    #     filled_mask[:, :, i] = binary_fill_holes(filled_mask[:, :, i])
 
     return filled_mask
 
@@ -248,6 +253,7 @@ def _compute_mask(
     sigma_blur: float,
     threshold_factor: float = 1,
     compute_convex_hull: bool = False,
+    registered_image: bool = False
 ) -> np.ndarray:
     """
     Process the mask for the given image.
@@ -261,6 +267,8 @@ def _compute_mask(
     - threshold_factor: float, factor to multiply the threshold
     - compute_convex_hull: bool, set to True to compute the convex hull of the mask. If set to
       False, a hole-filling operation will be performed instead.
+    - registered_image: bool, set to True if the image has been registered beforehand and thus
+      contains large regions of zeros that lead to sharp intensity gradients at the boundaries.
 
     Returns:
     - mask: numpy array, binary mask of the same shape as the input image
@@ -274,7 +282,7 @@ def _compute_mask(
     # Compute the mask
     if method == "snp otsu":
         mask = _snp_threshold_binarization(
-            im / im.max(), sigma_blur, threshold_factor
+            im / im.max(), sigma_blur, threshold_factor, registered_image
         )
     elif method == "otsu":
         mask = _otsu_threshold_binarization(
