@@ -3,6 +3,7 @@ import matplotlib
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from skimage.measure import regionprops
+from skimage.filters import threshold_otsu
 
 import organoid.utils as utils
 
@@ -60,7 +61,8 @@ class SpatialCorrelationPlotter:
             label_X: str = 'X',
             label_Y: str = 'Y',
             colormap: str = 'plasma',
-            sample_fraction: float = 0.005
+            sample_fraction: float = 0.005,
+            display_quadrants: bool = False
     ):
         
         quantity_X = self.quantity_X.copy()
@@ -123,6 +125,9 @@ class SpatialCorrelationPlotter:
                 show_individual_cells, ims, heatmap, xedges, yedges, custom_cmap,
                 sample_indices=sample_indices
             )
+
+        if display_quadrants:
+            self._display_quadrants(ax, quantity_X, quantity_Y)
 
 
         if show_linear_fit:
@@ -199,6 +204,13 @@ class SpatialCorrelationPlotter:
                 label=f"Y = {slope:.1E} X + {intercept:.1E}, R²={r2:.2f}")
         ax.legend(fontsize=10)
 
+    def _display_quadrants(self, ax, quantity_X, quantity_Y):
+
+        threshold_X = threshold_otsu(quantity_X)
+        threshold_Y = threshold_otsu(quantity_Y)
+
+        ax.axvline(threshold_X, color='black', linestyle='--')
+        ax.axhline(threshold_Y, color='black', linestyle='--')
 
     def _format_figure(
             self, fig, ax,
@@ -247,9 +259,10 @@ class SpatialCorrelationPlotter:
                     extent_Y: tuple = None,
                     extent_percentiles: tuple = None,
                     log_scale_X: bool = False,
-                    log_scale_Y: bool = False,):
+                    log_scale_Y: bool = False,
+                    display_quadrants: bool = False):
         
-        self.get_heatmap_figure(
+        fig, ax = self.get_heatmap_figure(
             bins=bins,
             show_individual_cells=show_individual_cells,
             show_linear_fit=show_linear_fit,
@@ -258,6 +271,7 @@ class SpatialCorrelationPlotter:
             extent_percentiles=extent_percentiles,
             log_scale_X=log_scale_X,
             log_scale_Y=log_scale_Y,
+            display_quadrants=display_quadrants
         )
         
-        plt.show()
+        fig.show()
