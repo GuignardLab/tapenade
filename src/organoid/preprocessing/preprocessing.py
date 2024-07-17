@@ -9,7 +9,7 @@ from tqdm.contrib.concurrent import process_map
 from typing import Optional, Tuple, Union
 
 from organoid.preprocessing._isotropize import _make_array_isotropic
-from organoid.preprocessing._local_normalization import _local_normalization
+from organoid.preprocessing._local_equalization import _local_equalization
 from organoid.preprocessing._thresholding import _compute_mask
 from organoid.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
@@ -25,14 +25,14 @@ from organoid.preprocessing._axis_alignment import (
 In typical order:
     1. making array isotropic
     2. compute mask
-    3. local image normalization
+    3. local image equalization
     (4. segmentation, not covered here)
     (5. spatial registration, not covered here)
     (6. temporal registration, not covered here)
     7. aligning major axis
     (8. cropping array using mask)
 """
-
+k
 
 def _parallel_make_array_isotropic(arrays, reshape_factors, order):
     mask, image, labels = arrays
@@ -208,7 +208,7 @@ def compute_mask(
     return mask
 
 
-def local_image_normalization(
+def local_image_equalization(
     image: np.ndarray,
     box_size: int,
     perc_low: float,
@@ -217,21 +217,21 @@ def local_image_normalization(
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
-    Performs local image normalization on either a single image or a temporal stack of images.
+    Performs local image equalization on either a single image or a temporal stack of images.
     Stretches the image histogram in local neighborhoods by remapping intesities in the range
     [perc_low, perc_high] to the range [0, 1].
     This helps to enhance the contrast and improve the visibility of structures in the image.
 
     Parameters:
     - image: numpy array, input image or temporal stack of images
-    - box_size: int, size of the local neighborhood for normalization
-    - perc_low: float, lower percentile for intensity normalization
-    - perc_high: float, upper percentile for intensity normalization
+    - box_size: int, size of the local neighborhood for equalization
+    - perc_low: float, lower percentile for intensity equalization
+    - perc_high: float, upper percentile for intensity equalization
     - mask: numpy array, binary mask used to set the background to zero (optional)
     - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
     Returns:
-    - image_norm: numpy array, normalized image or stack of normalized images
+    - image_norm: numpy array, equalized image or stack of equalized images
     """
 
     is_temporal = image.ndim == 4
@@ -242,10 +242,10 @@ def local_image_normalization(
         if mask_is_None:
             mask = [None] * image.shape[0]
 
-        # Apply local normalization to each time frame in the temporal stack
+        # Apply local equalization to each time frame in the temporal stack
         image_norm = np.array(
             [
-                _local_normalization(
+                _local_equalization(
                     image[ind_t],
                     box_size=box_size,
                     perc_low=perc_low,
@@ -253,13 +253,13 @@ def local_image_normalization(
                     mask=mask[ind_t],
                 )
                 for ind_t in tqdm(
-                    range(image.shape[0]), desc="Local normalization"
+                    range(image.shape[0]), desc="Local equalization"
                 )
             ]
         )
     else:
-        # Apply local normalization to the image
-        image_norm = _local_normalization(
+        # Apply local equalization to the image
+        image_norm = _local_equalization(
             image,
             box_size=box_size,
             perc_low=perc_low,
