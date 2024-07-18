@@ -91,14 +91,21 @@ def prop_principal_lengths(regionprops_prop, scale, return_principal_vectors: bo
 
 @numba.jit(nopython=True, nogil=True)
 def fast_tensor_inertia(centered_argwheres):
+    """
+    We apply the Parallel Axis Theorem on the individual voxels:
+    each cubic voxel has an individual diagonal inertia tensor
+    I = 1/6 * Identity, so its contribution to the inertia tensor
+    of the object (on the diagonal) is 1/6 * d^2, where d is the
+    distance of the voxel to the center of mass of the object.
+    """
 
     tensor = np.zeros((3,3), dtype=np.float32)
 
     for pos in centered_argwheres:
 
-        tensor[0,0] += (pos.dot(pos)+1/12) - pos[0]*pos[0] # y^2 + z^2
-        tensor[1,1] += (pos.dot(pos)+1/12) - pos[1]*pos[1] 
-        tensor[2,2] += (pos.dot(pos)+1/12) - pos[2]*pos[2] 
+        tensor[0,0] += pos[1]*pos[1] + pos[2]*pos[2] + 1/6 # y^2 + z^2
+        tensor[1,1] += pos[0]*pos[0] + pos[2]*pos[2] + 1/6 # x^2 + z^2
+        tensor[2,2] += pos[0]*pos[0] + pos[1]*pos[1] + 1/6 # x^2 + y^2
 
         tensor[0,1] += - pos[0]*pos[1] 
         tensor[0,2] += - pos[0]*pos[2] 

@@ -11,8 +11,8 @@ from typing import Union, Optional, List, Tuple
 
 def _smooth_gaussian(
     array: np.ndarray,
-    mask: Optional[np.ndarray],
     sigmas: Union[float, List[float]],
+    mask: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
     Performs convolution of 'array' with a gaussian kernel of
@@ -27,7 +27,6 @@ def _smooth_gaussian(
         # return skimage_gaussian(array, sigmas, preserve_range=True, mode='constant', cval=0.0)
         return scipy_gaussian(array, sigmas, mode='nearest')
     else:
-
         smooth_array = scipy_gaussian(
             np.where(mask, array * 1.0, 0.0), sigmas, mode='constant', cval=0.0
         )
