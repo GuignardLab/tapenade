@@ -3,7 +3,6 @@ from organoid.preprocessing._smoothing import _smooth_gaussian
 from scipy.optimize import minimize_scalar
 
 
-
 def _median_absolute_deviation(array):
     return np.nanmedian(np.abs(array - np.nanmedian(array)))
 
@@ -14,16 +13,27 @@ def _nans_outside_mask(array, mask):
 
 def _optimize_sigma(ref_array, mask, labels_mask):
 
-    def opt_func(sigma, labels_mask, mask):
+    def opt_func(sigma, ref_array, mask, labels_mask):
         ref_array_smooth = _smooth_gaussian(
             ref_array, 
-            sigma=sigma,
+            sigmas=sigma,
             mask_for_volume=labels_mask, 
             mask=mask
         )
-        return _median_absolute_deviation(np.nanmedian(ref_array_smooth, axis=(1,2)))
+
+        if labels_mask is not None:
+            res = np.divide(ref_array, ref_array_smooth, where=labels_mask)
+            res = _nans_outside_mask(res, labels_mask)
+        elif mask is not None:
+            res = np.divide(ref_array, ref_array_smooth, where=mask)
+            res = _nans_outside_mask(res, mask)
+        else:
+            res = ref_array / ref_array_smooth
+
+        return _median_absolute_deviation(np.nanmedian(res, axis=(1,2)))
     
-    res = minimize_scalar(opt_func, args=(labels_mask, mask), bounds=(10, 30), method='bounded')
+    res = minimize_scalar(opt_func, args=(ref_array, mask, labels_mask), bounds=(10, 30), 
+                          method='bounded', options={'maxiter': 5, 'disp':3})
 
     return res.x
 
@@ -65,7 +75,7 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
 
     ref_array_smooth = _smooth_gaussian(
         ref_array, 
-        sigma=sigma,
+        sigmas=sigma,
         mask_for_volume=labels_mask, 
         mask=mask
     )
@@ -82,6 +92,10 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
     # normalize array and reference array
     array_norm = np.divide(array, ref_array_smooth, where=mask_divide)
     ref_array_norm = np.divide(ref_array, ref_array_smooth, where=mask_divide)
+
+    if mask is not None:
+        array_norm = _nans_outside_mask(array_norm, mask)
+        ref_array_norm = _nans_outside_mask(ref_array_norm, mask)
 
     # rectify median intensity in both normalized arrays
     # to that of the median of the brightest neighboring planes
