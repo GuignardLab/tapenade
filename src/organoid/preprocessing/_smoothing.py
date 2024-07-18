@@ -9,11 +9,7 @@ from tqdm import tqdm
 from typing import Union, Optional, List, Tuple
 
 
-def _smooth_gaussian(
-    array: np.ndarray,
-    sigmas: Union[float, List[float]],
-    mask: Optional[np.ndarray] = None,
-) -> np.ndarray:
+def _smooth_gaussian(array, sigmas, mask=None, mask_for_volume=None):
     """
     Performs convolution of 'array' with a gaussian kernel of
     width(s) 'sigma'.
@@ -21,24 +17,56 @@ def _smooth_gaussian(
     masked value into account.
     """
 
-    # sigmas = sigmas if isinstance(sigmas, (int, float)) else np.array(sigmas)
+    sigmas = sigmas if isinstance(sigmas, (int, float)) else np.array(sigmas)
 
     if mask is None:
         # return skimage_gaussian(array, sigmas, preserve_range=True, mode='constant', cval=0.0)
-        return scipy_gaussian(array, sigmas, mode='nearest')
+        return scipy_gaussian(array, sigmas, mode="nearest", cval=0.0)
     else:
-        smooth_array = scipy_gaussian(
-            np.where(mask, array * 1.0, 0.0), sigmas, mode='constant', cval=0.0
-        )
 
-        # calculate renormalization factor for masked gaussian (the 'effective'
-        # volume of the gaussian kernel taking the mask into account)
-        effective_volume = scipy_gaussian(
-            mask * 1.0, sigmas, mode='constant', cval=0.0
-        )
+        mask = mask.astype(bool)
+
+        if mask_for_volume is None:
+
+            smooth_array = scipy_gaussian(
+                np.where(mask, array.astype(np.float32), 0.0),
+                sigmas,
+                mode="constant",
+                cval=0.0,
+                truncate=3.0,
+            )
+
+            # calculate renormalization factor for masked gaussian (the 'effective'
+            # volume of the gaussian kernel taking the mask into account)
+            effective_volume = scipy_gaussian(
+                mask.astype(np.float32), sigmas, mode="constant", cval=0.0, truncate=3.0
+            )
+
+        else:
+            mask_for_volume = mask_for_volume.astype(bool)
+
+            smooth_array = scipy_gaussian(
+                np.where(mask_for_volume, array.astype(np.float32), 0.0),
+                sigmas,
+                mode="constant",
+                cval=0.0,
+                truncate=3.0,
+            )
+
+            # calculate renormalization factor for masked gaussian (the 'effective'
+            # volume of the gaussian kernel taking the mask into account)
+            effective_volume = scipy_gaussian(
+                mask_for_volume.astype(np.float32),
+                sigmas,
+                mode="constant",
+                cval=0.0,
+                truncate=3.0,
+            )
 
         smooth_array = np.where(
-            mask, np.divide(smooth_array, effective_volume, where=mask), 0.0
+            mask,
+            np.divide(smooth_array, effective_volume, where=mask),
+            0.0,
         )
 
         return smooth_array
@@ -48,14 +76,15 @@ def _parallel_gaussian_smooth(
     input_tuple: Tuple[np.ndarray, np.ndarray],
     sigmas: Union[float, List[float]],
 ) -> np.ndarray:
-    data, mask = input_tuple
-    return _smooth_gaussian(data, mask, sigmas)
+    data, mask, mask_for_volume = input_tuple
+    return _smooth_gaussian(data, sigmas, mask, mask_for_volume)
 
 
 def _gaussian_smooth(
     image: np.ndarray,
     sigmas: Union[float, List[float]],
     mask: Optional[np.ndarray] = None,
+    mask_for_volume: Optional[np.ndarray] = None,
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
@@ -65,6 +94,7 @@ def _gaussian_smooth(
         image (ndarray): The input image or sequence of images.
         sigmas (float or list of floats): The standard deviation(s) of the Gaussian kernel.
         mask (ndarray, optional): The mask indicating the regions of interest. Default is None.
+        mask_for_volume (ndarray, optional): The mask indicating the regions of interest for volume calculation. Default is None.
         n_jobs (int, optional): The number of parallel jobs to run. Default is -1, which uses all available CPU cores.
 
     Returns:
@@ -78,12 +108,15 @@ def _gaussian_smooth(
         if mask is None:
             mask = [None] * image.shape[0]
 
+        if mask_for_volume is None:
+            mask_for_volume = [None] * image.shape[0]
+
         func = partial(_parallel_gaussian_smooth, sigmas=sigmas)
 
         if n_jobs == 1:
 
             iterable = tqdm(
-                zip(image, mask), total=len(image), desc="Smoothing image"
+                zip(image, mask, mask_for_volume), total=len(image), desc="Smoothing image"
             )
 
             return np.array([func(elem) for elem in iterable])
@@ -101,4 +134,4 @@ def _gaussian_smooth(
             return np.array(result)
 
     else:
-        return _smooth_gaussian(image, mask, sigmas)
+        return _smooth_gaussian(image, sigmas, mask, mask_for_volume)
