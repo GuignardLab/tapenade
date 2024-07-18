@@ -14,6 +14,7 @@ from organoid.preprocessing._thresholding import _compute_mask
 from organoid.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
+from organoid.preprocessing._intensity_normalization import _normalize_intensity
 
 """
 #! TODO:
@@ -32,7 +33,7 @@ In typical order:
     7. aligning major axis
     (8. cropping array using mask)
 """
-k
+
 
 def _parallel_make_array_isotropic(arrays, reshape_factors, order):
     mask, image, labels = arrays
@@ -272,6 +273,103 @@ def local_image_equalization(
         image_norm = np.where(mask, image_norm, 0.0)
 
     return image_norm
+
+
+def normalize_intensity(
+    image: np.ndarray,
+    ref_image: np.ndarray,
+    sigma: float = None,
+    mask: np.ndarray = None,
+    labels: np.ndarray = None,
+    width: int = 3,
+    n_jobs: int = -1,
+) -> Tuple[np.ndarray, np.ndarray]:
+    
+    """
+    Normalize the intensity of an image based on a reference image assumed to have 
+    ideally homogeneous signal (e.g DAPI).
+
+    Parameters:
+    - image: numpy array, input image to be normalized
+    - ref_image: numpy array, reference image used for normalization
+    - sigma: float, standard deviation for Gaussian smoothing of the reference 
+        image (default: None)
+    - mask: numpy array, binary mask of the sample (default: None)
+    - labels: numpy array, labels indicating the instances in which the reference
+        signal is expressed (default: None)
+    - width: int, number of neighboring planes to consider for reference plane 
+        calculation (default: 3)
+    - n_jobs: int, number of parallel jobs to use (-1 for all available CPUs, 1 for 
+        sequential execution) (default: -1)
+
+    Returns:
+    - image_norm: numpy array, normalized input image
+    - ref_image_norm: numpy array, normalized reference image
+    """
+
+    is_temporal = image.ndim == 4
+
+    if is_temporal:
+        if mask is None:
+            mask = [None] * image.shape[0]
+
+        if labels is None:
+            labels = [None] * image.shape[0]
+
+        if n_jobs == 1:
+            # Sequential normalization of each time frame
+            normalized_arrays = [
+                _normalize_intensity(
+                    im,
+                    ref_im,
+                    sigma=sigma,
+                    mask=ma,
+                    labels=lab,
+                    width=width,
+                )
+                for im, ref_im, ma, lab in tqdm(
+                    zip(image, ref_image, mask, labels),
+                    desc="Normalizing intensity",
+                    total=image.shape[0],
+                )
+            ]
+
+        else:
+            # Parallel normalization of each time frame using multiple processes
+            func_parallel = partial(
+                _normalize_intensity,
+                sigma=sigma,
+                mask=mask,
+                labels=labels,
+                width=width,
+            )
+
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
+
+            normalized_arrays = process_map(
+                func_parallel,
+                zip(image, ref_image),
+                max_workers=max_workers,
+                desc="Normalizing intensity",
+                total=image.shape[0],
+            )
+
+    else:
+        # Single image normalization
+        normalized_arrays = _normalize_intensity(
+            image, ref_image, sigma=sigma, mask=mask, labels=labels,
+            width=width
+        )
+
+    if is_temporal:
+        normalized_arrays =  tuple(map(np.array, zip(*normalized_arrays)))
+        return normalized_arrays
+    else:
+        return normalized_arrays
+    
+
 
 
 def align_array_major_axis(
