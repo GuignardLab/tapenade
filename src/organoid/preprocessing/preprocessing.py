@@ -132,11 +132,11 @@ def make_array_isotropic(
             mask, image, labels, reshape_factors=reshape_factors, order=order
         )
 
-    if sum([mask_not_None, image_not_None, labels_not_None]) > 1:
+    if sum([mask_not_None, image_not_None, labels_not_None]) > 1 and is_temporal:
         resized_arrays = tuple(map(np.array, zip(*resized_arrays)))
         return resized_arrays
     else:
-        return np.array(resized_arrays)
+        return resized_arrays
 
 
 def compute_mask(
@@ -550,4 +550,4 @@ def crop_array_using_mask(
     elif labels is not None:
         return mask_cropped, labels_cropped
     else:
-        return mask_cropped
+        return mask_cropped 
