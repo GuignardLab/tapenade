@@ -58,6 +58,12 @@ def add_ellipsoidal_nature_bool(regionprops_prop, scale):
 
     return regionprops_prop
 
+def add_anisotropy_coefficient(regionprops_prop, scale):
+    
+    regionprops_prop.anisotropy_coefficient = prop_anisotropy_coefficient(regionprops_prop, scale)
+
+    return regionprops_prop
+
 def add_true_strain_tensor(regionprops_prop, scale):
 
     regionprops_prop.true_strain_tensor = prop_true_strain_tensor(regionprops_prop, scale)
@@ -220,7 +226,16 @@ def prop_ellipsoidal_coefficients(regionprops_prop, scale):
 
     return alpha, beta, gamma
 
-    
+def prop_anisotropy_coefficient(regionprops_prop, scale):
+    """
+    Ratio of the longest to the shortest principal axis.
+    """
+    if not hasattr(regionprops_prop, 'principal_lengths'):
+        regionprops_prop = add_principal_lengths(regionprops_prop, scale)
+
+    l1, _, l3 = regionprops_prop.principal_lengths
+
+    return l1/l3
 
 
 
