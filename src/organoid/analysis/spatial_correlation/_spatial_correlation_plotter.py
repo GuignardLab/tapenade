@@ -42,12 +42,12 @@ class SpatialCorrelationPlotter:
 
         self.xys = np.array([self.quantity_X, self.quantity_Y]).T
 
-    def normalize_quantity(self, quantity):
+    def _normalize_quantity(self, quantity):
         return (quantity - np.median(quantity)) / np.std(quantity)
 
     def get_heatmap_figure(
             self, 
-            bins: tuple = (20, 20),
+            bins: list = [20, 20],
             show_individual_cells: bool = False,
             show_linear_fit: bool = True,
             normalize_quantities: bool = False,
@@ -69,8 +69,8 @@ class SpatialCorrelationPlotter:
         quantity_Y = self.quantity_Y.copy()
         
         if normalize_quantities:
-            quantity_Y = self.normalize_quantity(quantity_Y)
-            quantity_X = self.normalize_quantity(quantity_X)
+            quantity_Y = self._normalize_quantity(quantity_Y)
+            quantity_X = self._normalize_quantity(quantity_X)
             log_scale_X = False
             log_scale_Y = False
         
@@ -81,8 +81,12 @@ class SpatialCorrelationPlotter:
         
         if extent_X is None:
             extent_X = (np.min(quantity_X), np.max(quantity_X))
+        else:
+            bins[0] = np.linspace(extent_X[0], extent_X[1], bins[0]+1)
         if extent_Y is None:
             extent_Y = (np.min(quantity_Y), np.max(quantity_Y))
+        else:
+            bins[1] = np.linspace(extent_Y[0], extent_Y[1], bins[1]+1)
 
         bins = list(bins)
         fig, ax = plt.subplots(figsize=figsize)
@@ -169,8 +173,8 @@ class SpatialCorrelationPlotter:
 
 
         if normalize_quantities:
-            quantity_X = self.normalize_quantity(quantity_X)
-            quantity_Y = self.normalize_quantity(quantity_Y)
+            quantity_X = self._normalize_quantity(quantity_X)
+            quantity_Y = self._normalize_quantity(quantity_Y)
 
         indX = np.clip(np.digitize(quantity_X, xedges) - 1, 0, heatmap.shape[0] - 1)
         indY = np.clip(np.digitize(quantity_Y, yedges) - 1, 0, heatmap.shape[1] - 1)
