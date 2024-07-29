@@ -8,7 +8,8 @@ def _make_array_isotropic(
         mask: np.ndarray = None, 
         image: np.ndarray = None,
         labels: np.ndarray = None,
-        reshape_factors: Tuple[float, float, float] = (1, 1, 1),
+        input_pixelsize: Tuple[float, float, float] = (1, 1, 1),
+        output_pixelsize: Tuple[float, float, float] = (1, 1, 1),
         order: int = 1
     ):
     """
@@ -18,12 +19,15 @@ def _make_array_isotropic(
     - mask (ndarray): The mask indicating the valid region.
     - image (ndarray): The image to be resampled.
     - labels (ndarray): The segmentation labels.
-    - reshape_factors (tuple): The zoom factors for each dimension.
+    - input_pixelsize (tuple): The input pixel size (e.g in microns).
+    - output_pixelsize (tuple): The output pixel size (e.g in microns).
     - order (int): The order of the spline interpolation.
 
     Returns:
         ndarray: The resampled mask, image, or labels.
     """
+
+    reshape_factors = np.array(input_pixelsize) / np.array(output_pixelsize)
     
     if mask is not None:
         mask_isotropic = zoom(mask, reshape_factors, order=0)

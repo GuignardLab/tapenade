@@ -50,7 +50,8 @@ def make_array_isotropic(
     mask: np.ndarray = None,
     image: np.ndarray = None,
     labels: np.ndarray = None,
-    reshape_factors: Tuple[float, float, float] = (1, 1, 1),
+    input_pixelsize: Tuple[float, float, float] = (1, 1, 1),
+    output_pixelsize: Tuple[float, float, float] = (1, 1, 1),
     order: int = 1,
     n_jobs: int = -1,
 ) -> np.ndarray:
@@ -61,7 +62,8 @@ def make_array_isotropic(
     - mask: numpy array, input mask
     - image: numpy array, input image
     - labels: numpy array, input labels
-    - reshape_factors: tuple of floats, reshape factors for each dimension
+    - input_pixelsize: tuple of floats, input pixel dimensions (e.g. in microns)
+    - output_pixelsize: tuple of floats, output pixel dimensions (e.g. in microns)
     - order: int, order of interpolation for resizing (defaults to 1 for
       linear interpolation). Choose 0 for nearest-neighbor interpolation
       (e.g. for label images)
@@ -98,7 +100,7 @@ def make_array_isotropic(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_arrays = [
-                _make_array_isotropic(ma, im, labs, reshape_factors, order=order)
+                _make_array_isotropic(ma, im, labs, input_pixelsize, output_pixelsize, order=order)
                 for ma, im, labs in tqdm(
                     zip(mask, image, labels),
                     desc="Making array isotropic",
@@ -110,7 +112,8 @@ def make_array_isotropic(
             # Parallel resizing of each time frame using multiple processes
             func_parallel = partial(
                 _parallel_make_array_isotropic,
-                reshape_factors=reshape_factors,
+                input_pixelsize=input_pixelsize,
+                output_pixelsize=output_pixelsize,
                 order=order,
             )
 
@@ -129,7 +132,10 @@ def make_array_isotropic(
     else:
         # Resizing the whole image
         resized_arrays = _make_array_isotropic(
-            mask, image, labels, reshape_factors=reshape_factors, order=order
+            mask, image, labels, 
+            input_pixelsize=input_pixelsize,
+            output_pixelsize=output_pixelsize,
+            order=order
         )
 
     if sum([mask_not_None, image_not_None, labels_not_None]) > 1:
