@@ -72,7 +72,7 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
     # compute smoothed reference array for normalization
     if sigma is None:
         sigma = _optimize_sigma(ref_array, mask, labels_mask)
-
+        print('sigma = ',sigma)
     ref_array_smooth = _smooth_gaussian(
         ref_array, 
         sigmas=sigma,
