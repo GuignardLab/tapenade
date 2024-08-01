@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 import napari
 import numpy as np
 import registrationtools
-import tifffile
+import io
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.transform import Rotation
 from skimage.measure import regionprops
-
+from skimage import io
 
 def extract_positions(path_positions: str):
     """
@@ -36,7 +36,6 @@ def extract_positions(path_positions: str):
         ypos[i] = pos_y[i].attributes["value"].value
 
     return (xpos, ypos)
-
 
 def plot_positions(path_ref_positions: str, path_float_positions: str):
     """
@@ -69,7 +68,6 @@ def plot_positions(path_ref_positions: str, path_float_positions: str):
 
     plt.legend()
 
-
 def associate_positions(path_ref_positions: str, path_float_positions: str):
     """
     Associate the objects from the reference view with the objects from the floating view, by solving a linear sum assignement between the two distribution
@@ -97,8 +95,9 @@ def associate_positions(path_ref_positions: str, path_float_positions: str):
                 + math.pow(ypos_ref[i] - ypos_float[j], 2)
             )
     row_ind, col_ind = linear_sum_assignment(cost)
-    return (list(row_ind + 1), list(col_ind + 1))
-
+    list_row = [int(i) for i in list(row_ind + 1)]
+    list_col = [int(i) for i in list(col_ind + 1)]
+    return (list_row,list_col)
 
 def create_folders(
     folder_experiment: str,
@@ -141,23 +140,23 @@ def create_folders(
         os.mkdir(os.path.join(folder_sample, "registered"))
         os.mkdir(os.path.join(folder_sample, "fused"))
 
-        image_ref = tifffile.imread(
+        image_ref = io.imread(
             Path(folder_experiment) / f"{filename_ref}.tif"
         )
-        image_float = tifffile.imread(
+        image_float = io.imread(
             Path(folder_experiment) / f"{filename_float}.tif"
         )
         
         for ind_ch, ch in enumerate(channels):
-            imref = (image_ref[:, ind_ch, :, :])
-            imfloat = (image_float[:,ind_ch,:,:])
-            tifffile.imwrite(
+            imref = (image_ref[:, :, :,ind_ch])
+            imfloat = (image_float[:,:,:,ind_ch])
+            io.imsave(
                 Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
-                imref.astype(np.float32),
+                imref, ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
             )  # ,imagej=True, metadata={'axes': 'TZYX'})
-            tifffile.imwrite(
+            io.imsave(
                 Path(folder_sample) / "raw" / f"{filename_float}_{ch}.tif",
-                imfloat.astype(np.float32),
+                imfloat,
             )  # ,imagej=True, metadata={'axes': 'TZYX'})>
 
 def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
@@ -179,7 +178,6 @@ def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
     #in the napari plugin, the translation computed is the one after the rotation, so we need to set the translation trans1 before rotation to 0
     init_trsfs = list_init_trsf(trans1=[0, 0, 0], trans2=[trans_z, trans_y, trans_x], rot=[rot_x, rot_y, rot_z], scale=scale)
     return (init_trsfs)
-
 
 def manual_registration_fct(
     reference_landmarks, floating_landmarks, scale: tuple = (1, 1, 1)
@@ -424,7 +422,6 @@ def register(
     tr = registrationtools.SpatialRegistration(data)
     tr.run_trsf()
 
-
 def check_napari(
     folder: str,
     reference_image,
@@ -456,16 +453,16 @@ def check_napari(
         if os.path.exists(
             Path(folder) / "registered" / reference_image
         ):  # if the bounding box or voxel size has changed, then the reference image has been saved as an output.
-            ref_im = tifffile.imread(
+            ref_im = io.imread(
                 Path(folder) / "registered" / reference_image
             )
         else:  # if the bbox did not change, the reference image has not changed and is found in the raw folder only.
-            ref_im = tifffile.imread(Path(folder) / "raw" / reference_image)
+            ref_im = io.imread(Path(folder) / "raw" / reference_image)
     else:
         ref_im = reference_image
 
     if isinstance(floating_image, (str | Path)):
-        float_im = tifffile.imread(
+        float_im = io.imread(
             Path(folder) / "registered" / floating_image
         )
     else:
@@ -501,7 +498,6 @@ def check_napari(
 
     napari.run()
 
-
 def sigmoid(x, x0, p):
     """
     Sigmoid function, to weight the images by the distance to the edges
@@ -511,7 +507,6 @@ def sigmoid(x, x0, p):
     # for z in range(len(z)) :
     return 1 / (1 + np.exp(-p * (x - x0)))
 
-
 def fuse_sides(
     path_registered_data: str,
     reference_image_reg: str,
@@ -520,8 +515,7 @@ def fuse_sides(
     name_output: str = "fusion",
     slope_coeff: int = 20,
     axis: int = 0,
-    return_image=False,
-    dtype=np.float32
+    return_image=False
 ):
     """
     Fuse the two sides of the sample, using the previously registered images
@@ -548,19 +542,19 @@ def fuse_sides(
 
     ###Takes the previously saved images (two registered sides)
     if isinstance(reference_image_reg, (str | Path)):
-        ref_image = tifffile.imread(
+        ref_image = io.imread(
             Path(path_registered_data) / reference_image_reg
         )
     else:
         ref_image = ref_image
 
     if isinstance(floating_image_reg, (str | Path)):
-        float_image = tifffile.imread(
+        float_image = io.imread(
             Path(path_registered_data) / floating_image_reg
         )
     else:
         float_image = float_image
-
+    dtype_input=float_image.dtype
     mask_r = ref_image > 0
     mask_f = float_image > 0
     mask_fused = mask_r & mask_f
@@ -572,17 +566,14 @@ def fuse_sides(
     w2 = sigmoid(cumsum_normalized, x0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
-    fusion = (ref_image * w1 + float_image * w2).astype(dtype)
+    fusion = (ref_image * w1 + float_image * w2)
 
     if return_image:
         return fusion
-
-    tifffile.imwrite(Path(folder_output) / name_output, fusion)
-
+    io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
 
 def write_hyperstacks(
-    path: str, sample_id: str, channels: list, return_image=False,dtype=np.float32
-):
+    path: str, sample_id: str, channels: list, return_image=False):#,dtype=np.float32
     """
     Writes the hyperstacks, by stacking the channels of the registered images
 
@@ -598,22 +589,19 @@ def write_hyperstacks(
         if True, returns the hyperstack, by default False
     """
 
-    image = tifffile.imread(
+    image = io.imread(
         Path(path) / f"{sample_id}_{channels[0]}.tif")  # reading one image just to extract the shape of the image and initialize the hyperstack
-    (z, x, y) = image.shape
-    new_image = np.zeros((z, len(channels), x, y))
-
+    (z, y, x) = image.shape
+    new_image = np.zeros((z, y, x,len(channels)))
     for ch in range(len(channels)):
-        one_channel = tifffile.imread(
-            Path(path) / f"{sample_id}_{channels[ch]}.tif",     )
-        new_image[:, ch, :, :] = one_channel
+        one_channel = io.imread(
+            Path(path) / f"{sample_id}_{channels[ch]}.tif")
+        print(one_channel.shape)
+        new_image[:, :, :,ch] = one_channel
 
-    new_image=new_image.astype(dtype)
     if return_image:
         return new_image
-
-    tifffile.imwrite(Path(path) / f"{sample_id}_registered.tif", new_image, imagej=True)
-
+    io.imsave(Path(path) / f"{sample_id}_registered.tif", new_image) #will save in 32 bit. If forced to 16bit, not compatible with Fiji.
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
     """
@@ -637,23 +625,7 @@ def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
     ] = centermass_label
     return landmarks
 
-
 def remove_previous_files(path):
     filelist = glob.glob(os.path.join(path, "*.tif"))
     for f in filelist:
         os.remove(f)
-
-
-def reconstruct_foo():
-    print("reconstruct")
-    return -1
-
-
-def pipeline_reconstruction(*args):  # image1, image2, sigma, ...
-    print(*args)
-
-
-def script_run():
-
-    # Parse the arguments
-    pipeline_reconstruction(1, 2, 3, 4, 5)
