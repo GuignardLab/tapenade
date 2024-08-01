@@ -23,8 +23,8 @@ def extract_positions(path_positions: str):
     path_positions : str
         path to the xml file
     """
-    positions = minidom.parse(path_positions)
-
+    print(path_positions)
+    positions = minidom.parse(str(path_positions)) #need to convert the path to a string, otherwise minidom does not work for Windows paths
     pos_x = positions.getElementsByTagName("dXPosition")
     pos_y = positions.getElementsByTagName("dYPosition")
 
@@ -38,63 +38,63 @@ def extract_positions(path_positions: str):
     return (xpos, ypos)
 
 
-def plot_positions(path_bottom_positions: str, path_top_positions: str):
+def plot_positions(path_ref_positions: str, path_float_positions: str):
     """
     Plot the positions of the objects from the xml file, to visualize and manually check what number have to be associated
     Parameters
     ----------
-    path_bottom_positions : str
-        path to the xml file for the bottom view
-    path_top_positions : str
-        path to the xml file for the top view
+    path_ref_positions : str
+        path to the xml file for the reference view
+    path_float_positions : str
+        path to the xml file for the floating view
 
     """
-    (xpos_b, ypos_b) = extract_positions(path_bottom_positions)
-    (xpos_t, ypos_t) = extract_positions(path_top_positions)
+    (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
+    (xpos_float, ypos_float) = extract_positions(path_float_positions)
 
-    list_number_b = [
-        i + 1 for i in range(len(xpos_b))
+    list_number_ref = [
+        i + 1 for i in range(len(xpos_ref))
     ]  # the objects will have an index going from 1 to the total number, instead of having the id chosen during the aquisition. Problem ?
     fig, ax = plt.subplots()
-    ax.scatter(xpos_b, ypos_b, label="bottom")
+    ax.scatter(xpos_ref, ypos_ref, label="ref")
 
-    for i, txt in enumerate(list_number_b):
-        ax.annotate(txt, (xpos_b[i], ypos_b[i]))
+    for i, txt in enumerate(list_number_ref):
+        ax.annotate(txt, (xpos_ref[i], ypos_ref[i]))
 
-    list_number_t = [i + 1 for i in range(len(xpos_t))]
-    ax.scatter(xpos_t, ypos_t, label="top")
+    list_number_float = [i + 1 for i in range(len(xpos_float))]
+    ax.scatter(xpos_float, ypos_float, label="float")
 
-    for i, txt in enumerate(list_number_t):
-        ax.annotate(txt, (xpos_t[i], ypos_t[i]))
+    for i, txt in enumerate(list_number_float):
+        ax.annotate(txt, (xpos_float[i], ypos_float[i]))
 
     plt.legend()
 
 
-def associate_top_bottom(path_bottom_positions: str, path_top_positions: str):
+def associate_positions(path_ref_positions: str, path_float_positions: str):
     """
-    Associate the objects from the bottom view with the objects from the top view, by solving a linear sum assignement between the two distribution
+    Associate the objects from the reference view with the objects from the floating view, by solving a linear sum assignement between the two distribution
     Parameters
     ----------
-    path_bottom_positions : str
-        path to the xml file for the bottom view
-    path_top_positions : str
-        path to the xml file for the top view
+    path_ref_positions : str
+        path to the xml file for the ref view
+    path_float_positions : str
+        path to the xml file for the float view
 
     Returns
     -------
-    2 lists of indices, bottom then top, sorted according to the asssgnement
+    2 lists of indices, ref then float, sorted according to the asssgnement
 
     """
     
-    (xpos_b, ypos_b) = extract_positions(path_bottom_positions)
-    (xpos_t, ypos_t) = extract_positions(path_top_positions)
-    ypos_t=-ypos_t
-    cost = np.zeros((len(xpos_b), len(xpos_t)))
-    for i in range(len(xpos_b)):
-        for j in range(len(xpos_t)):
+    (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
+    (xpos_float, ypos_float) = extract_positions(path_float_positions)
+    ypos_float=-ypos_float
+    cost = np.zeros((len(xpos_ref), len(xpos_float)))
+    for i in range(len(xpos_ref)):
+        for j in range(len(xpos_float)):
             cost[i, j] = math.sqrt(
-                math.pow(xpos_b[i] - xpos_t[j], 2)
-                + math.pow(ypos_b[i] - ypos_t[j], 2)
+                math.pow(xpos_ref[i] - xpos_float[j], 2)
+                + math.pow(ypos_ref[i] - ypos_float[j], 2)
             )
     row_ind, col_ind = linear_sum_assignment(cost)
     return (list(row_ind + 1), list(col_ind + 1))
@@ -188,8 +188,8 @@ def manual_registration_fct(
     """
     Finds the transformation between 2 sets of points in 3D.
     If the automatic registration can't find an accurate transformation :
-    -open your bottom and top images on a visualization software (eg Napari) and create 2 label images of the same shape, one will contain the landmarks for the bottom image and the other for the top image.
-    -add landmarks, preferentially sphere on the objects you can identify on both sides. Each object needs to have the same label on both sides, top and botttom. The more landmarks, the better.
+    -open your reference and floating images on a visualization software (eg Napari) and create 2 label images of the same shape, one will contain the landmarks for the reference image and the other for the floating image.
+    -add landmarks, preferentially sphere on the objects you can identify on both sides. Each object needs to have the same label on both sides, float and ref. The more landmarks, the better.
     -then gives these 2 label arrays to the function manual_registration_fct, it will compute the transformation between the two sets of points
 
     Parameters
@@ -201,7 +201,7 @@ def manual_registration_fct(
 
     Returns
     -------
-    translation and rotation to apply to the top image to register it on the bottom image
+    translation and rotation to apply to the floating image to register it on the reference image
     In the following order : rotation_z, rotation_y, rotation_x, translation_z, translation_y, translation_x.
     """
 
@@ -264,7 +264,7 @@ def manual_registration_fct(
     center_image = (np.array(reference_landmarks.shape) / 2) * scale
     translation1 = center_image - centermass_float
     translation2 = centermass_ref - center_image
-    return (rotation_angles, translation1, translation2)
+    return (list(rotation_angles), list(translation1), list(translation2)) #into list to be able to copy paste directly into the registration function
 
 def list_init_trsf(trans1,trans2,rot,scale=[1,1,1]):
     # trans1_in_um=np.multiply(trans1,scale)
@@ -387,13 +387,11 @@ def register(
     if input_init_trsf_from_plugin != "":
     #if the user input the json file from the plugin, the json file is used as init trsf no matter the parameters rot, trans1, trans 2 or other_trsf
         init_trsfs=transformation_from_plugin(input_init_trsf_from_plugin,scale=input_voxel)
-        print('here')
     elif input_init_trsf_from_plugin == "" and other_trsf is not None:
         print('other_trsf',other_trsf)
     # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
         init_trsfs = other_trsf
     else:  # is the user did not precise other_trsf or any json file, then we use the parameters rot, trans1 and trans2 to "build" init_trsfs.
-        print('there')
         init_trsfs = list_init_trsf(trans1=trans1,trans2=trans2,rot=rot,scale=input_voxel)
     data = {
         "path_to_data": str(path_data),
