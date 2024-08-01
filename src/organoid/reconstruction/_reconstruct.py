@@ -4,7 +4,7 @@ import math
 import os
 from pathlib import Path
 from xml.dom import minidom
-
+import tifffile
 import matplotlib.pyplot as plt
 import napari
 import numpy as np
@@ -601,7 +601,9 @@ def write_hyperstacks(
 
     if return_image:
         return new_image
-    io.imsave(Path(path) / f"{sample_id}_registered.tif", new_image) #will save in 32 bit. If forced to 16bit, not compatible with Fiji.
+
+    tifffile.imwrite(Path(path) / f"{sample_id}_registered.tif", new_image.astype(np.float32), imagej=True, compression=('zlib', 1))#float16 not compatible with Fiji
+
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
     """
