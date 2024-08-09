@@ -8,13 +8,13 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from typing import Optional, Tuple, Union
 
-from organoid.preprocessing._isotropize import _make_array_isotropic
-from organoid.preprocessing._local_equalization import _local_equalization
-from organoid.preprocessing._thresholding import _compute_mask
-from organoid.preprocessing._axis_alignment import (
+from tapenade.preprocessing._isotropize import _make_array_isotropic
+from tapenade.preprocessing._local_equalization import _local_equalization
+from tapenade.preprocessing._thresholding import _compute_mask
+from tapenade.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
-from organoid.preprocessing._intensity_normalization import _normalize_intensity
+from tapenade.preprocessing._intensity_normalization import _normalize_intensity
 
 """
 #! TODO:
@@ -45,12 +45,63 @@ def _parallel_make_array_isotropic(arrays, reshape_factors, order):
         order=order,
     )
 
+def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:int=0) :
+    """
+    Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
+    Parameters
+    ----------
+    mask : np.array (bool)
+        mask of the image
+    image : np.array
+        image to normalize
+    labels : np.array
+        labels of the mask
+    scale : tuple   
+        scale factors for the isotropic transformation
+    sigma : int 
+        sigma for the gaussian filter
+    pos_ref : int
+        position of the reference channel, starting from 0
+    Returns 
+    -------
+    norm_image : np.array
+        normalized and isotropic image
+    """
+
+    if len(image.shape)>3 : #if multichannel image
+        nb_channels = image.shape[1]
+        assert pos_ref<nb_channels, "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
+        iso_image=[]
+        liste_channels = np.linspace(0,nb_channels-1,nb_channels,dtype=int)
+        for ch in liste_channels :
+            channel = image[:,ch,:,:]
+            (mask_iso,channel_iso,seg_iso)= make_array_isotropic(mask=mask,image=channel,labels=labels,input_pixelsize=scale,output_pixelsize=(1,1,1),order=1,n_jobs=-1)   
+            iso_image.append(channel_iso)
+
+        iso_image = np.array(iso_image)
+        iso_image=iso_image.transpose(1,0,2,3) #stay in convention ZCYX
+        
+        ref_channel = iso_image[:,pos_ref,:,:] #should check before if pos_ref>=iso_image.shape[1]
+        liste_float_channels = np.delete(liste_channels,pos_ref)
+        norm_image = np.zeros_like(iso_image)
+        for ch_float in liste_float_channels:
+            channel = iso_image[:,ch_float,:,:]
+            channel_norm,ref_norm = normalize_intensity(image=channel,ref_image=ref_channel,mask=mask_iso,labels=seg_iso,sigma=sigma)
+            norm_image[:,ch_float,:,:]=channel_norm
+        norm_image[:,pos_ref,:,:] = ref_norm
+
+    else : #3D data, one channel
+        (mask_iso,iso_image,seg_iso)= make_array_isotropic(mask=mask,image=image,labels=labels,reshape_factors=np.divide(scale,(1,1,1)))   
+        norm_image,_ = normalize_intensity(image=iso_image,ref_image=iso_image,mask=mask_iso,labels=seg_iso,sigma=sigma)
+
+    return(mask_iso,norm_image,seg_iso)
 
 def make_array_isotropic(
     mask: np.ndarray = None,
     image: np.ndarray = None,
     labels: np.ndarray = None,
-    reshape_factors: Tuple[float, float, float] = (1, 1, 1),
+    input_pixelsize: Tuple[float, float, float] = (1, 1, 1),
+    output_pixelsize: Tuple[float, float, float] = (1, 1, 1),
     order: int = 1,
     n_jobs: int = -1,
 ) -> np.ndarray:
@@ -61,7 +112,8 @@ def make_array_isotropic(
     - mask: numpy array, input mask
     - image: numpy array, input image
     - labels: numpy array, input labels
-    - reshape_factors: tuple of floats, reshape factors for each dimension
+    - input_pixelsize: tuple of floats, input pixel dimensions (e.g. in microns)
+    - output_pixelsize: tuple of floats, output pixel dimensions (e.g. in microns)
     - order: int, order of interpolation for resizing (defaults to 1 for
       linear interpolation). Choose 0 for nearest-neighbor interpolation
       (e.g. for label images)
@@ -98,7 +150,7 @@ def make_array_isotropic(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_arrays = [
-                _make_array_isotropic(ma, im, labs, reshape_factors, order=order)
+                _make_array_isotropic(ma, im, labs, input_pixelsize, output_pixelsize, order=order)
                 for ma, im, labs in tqdm(
                     zip(mask, image, labels),
                     desc="Making array isotropic",
@@ -110,7 +162,8 @@ def make_array_isotropic(
             # Parallel resizing of each time frame using multiple processes
             func_parallel = partial(
                 _parallel_make_array_isotropic,
-                reshape_factors=reshape_factors,
+                input_pixelsize=input_pixelsize,
+                output_pixelsize=output_pixelsize,
                 order=order,
             )
 
@@ -129,14 +182,17 @@ def make_array_isotropic(
     else:
         # Resizing the whole image
         resized_arrays = _make_array_isotropic(
-            mask, image, labels, reshape_factors=reshape_factors, order=order
+            mask, image, labels, 
+            input_pixelsize=input_pixelsize,
+            output_pixelsize=output_pixelsize,
+            order=order
         )
 
-    if sum([mask_not_None, image_not_None, labels_not_None]) > 1:
+    if sum([mask_not_None, image_not_None, labels_not_None]) > 1 and is_temporal:
         resized_arrays = tuple(map(np.array, zip(*resized_arrays)))
         return resized_arrays
     else:
-        return np.array(resized_arrays)
+        return resized_arrays
 
 
 def compute_mask(
@@ -524,12 +580,14 @@ def crop_array_using_mask(
     # Get the mask slice
     mask_slice = regionprops(mask_for_slice.astype(int))[0].slice
 
+    mask_zyx_shape = mask.shape[1:] if is_temporal else mask.shape
+
     # Add margin to the slice if specified
     if margin > 0:
         mask_slice = tuple(
             slice(
                 max(0, mask_slice[i].start - margin),
-                min(mask_slice[i].stop + margin, mask.shape[i + 1]),
+                min(mask_slice[i].stop + margin, mask_zyx_shape[i]),
             )
             for i in range(3)
         )
@@ -550,4 +608,4 @@ def crop_array_using_mask(
     elif labels is not None:
         return mask_cropped, labels_cropped
     else:
-        return mask_cropped
+        return mask_cropped 

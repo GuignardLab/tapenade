@@ -1,7 +1,7 @@
 import numpy as np
 from os import cpu_count
 from tqdm.contrib.concurrent import process_map
-from organoid.preprocessing._labels_masking import (
+from tapenade.preprocessing._labels_masking import (
     _remove_labels_outside_of_mask,
 )
 

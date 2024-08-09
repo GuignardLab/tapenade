@@ -1,5 +1,5 @@
 import numpy as np
-from organoid.preprocessing._smoothing import _smooth_gaussian
+from tapenade.preprocessing._smoothing import _smooth_gaussian
 from scipy.optimize import minimize_scalar
 
 
@@ -72,7 +72,7 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
     # compute smoothed reference array for normalization
     if sigma is None:
         sigma = _optimize_sigma(ref_array, mask, labels_mask)
-
+        print('sigma = ',sigma)
     ref_array_smooth = _smooth_gaussian(
         ref_array, 
         sigmas=sigma,
@@ -98,7 +98,7 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
         ref_array_norm = _nans_outside_mask(ref_array_norm, mask)
 
     # rectify median intensity in both normalized arrays
-    # to that of the median of the brightest neighboring planes
+    # to that of the median of the brightest consecutive planes
     z_ref = _find_reference_plane_from_medians(ref_array)
     z_ref_norm = _find_reference_plane_from_medians(ref_array_norm)
 
