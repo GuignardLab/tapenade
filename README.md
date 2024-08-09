@@ -8,6 +8,8 @@
 
 A repository to process 3D organoid images acquired with deep imaging microscopy.
 
+If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade).
+
 This repository has been developed by (in alphabetical order):
 
 - [Alice Gros](mailto:alice.gros@univ-amu.fr)
