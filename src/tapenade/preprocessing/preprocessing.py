@@ -45,7 +45,7 @@ def _parallel_make_array_isotropic(arrays, reshape_factors, order):
         order=order,
     )
 
-def isotropize_and_normalize(mask,image,labels,scale,sigma:int=25,pos_ref:int=0) :
+def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:int=0) :
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
     Parameters
@@ -75,7 +75,7 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:int=25,pos_ref:int=0)
         liste_channels = np.linspace(0,nb_channels-1,nb_channels,dtype=int)
         for ch in liste_channels :
             channel = image[:,ch,:,:]
-            (mask_iso,channel_iso,seg_iso)= make_array_isotropic(mask=mask,image=channel,labels=labels,reshape_factors=np.divide(scale,(1,1,1)))   
+            (mask_iso,channel_iso,seg_iso)= make_array_isotropic(mask=mask,image=channel,labels=labels,input_pixelsize=scale,output_pixelsize=(1,1,1),order=1,n_jobs=-1)   
             iso_image.append(channel_iso)
 
         iso_image = np.array(iso_image)
@@ -94,7 +94,7 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:int=25,pos_ref:int=0)
         (mask_iso,iso_image,seg_iso)= make_array_isotropic(mask=mask,image=image,labels=labels,reshape_factors=np.divide(scale,(1,1,1)))   
         norm_image,_ = normalize_intensity(image=iso_image,ref_image=iso_image,mask=mask_iso,labels=seg_iso,sigma=sigma)
 
-    return(norm_image)
+    return(mask_iso,norm_image,seg_iso)
 
 def make_array_isotropic(
     mask: np.ndarray = None,
