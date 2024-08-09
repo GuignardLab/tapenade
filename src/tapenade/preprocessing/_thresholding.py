@@ -226,7 +226,7 @@ def _compute_mask(
     Parameters:
     - image: numpy array, input image
     - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
-      'otsu' for Otsu's thresholding, or 'histomin' for Histogram Minimum thresholding.
+      or 'otsu' for Otsu's thresholding.
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold
