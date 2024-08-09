@@ -62,7 +62,7 @@ def find_seg_errors(segmentation:np.ndarray,image:np.ndarray):
     image : intensity image, has to be the same size as segmentatio,
 
     Outputs
-    The Intensity_Distrib array, for which each line corresponds to a label in the segmentation.
+    The intensity_distribution array, for which each line corresponds to a label in the segmentation.
     Column 1 is the label's id
     Col 2 is its mean intensity (in the ROI)
     Col 3 is the std of its intensity distrib
@@ -73,20 +73,20 @@ def find_seg_errors(segmentation:np.ndarray,image:np.ndarray):
     list_labels.remove(0)
     print(len(list_labels),' labels to process')
 
-    Intensity_Distrib=np.zeros((len(list_labels),4)) 
+    intensity_distribution=np.zeros((len(list_labels),4)) 
     for id,label in tqdm(enumerate(list_labels)) :
-        Intensity_Distrib[id,0]=label
+        intensity_distribution[id,0]=label
         mask=(segmentation==label)
         list_pix=image[mask]
         n, bins = np.histogram(list_pix)
         mids = 0.5*(bins[1:] + bins[:-1])
         mean = np.average(mids, weights=n)
         var = np.average((mids - mean)**2, weights=n)
-        Intensity_Distrib[id,1]=mean
-        Intensity_Distrib[id,2]=var
-        Intensity_Distrib[id,3]=var/mean
+        intensity_distribution[id,1]=mean
+        intensity_distribution[id,2]=var
+        intensity_distribution[id,3]=var/mean
 
-    return (Intensity_Distrib)
+    return (intensity_distribution)
 
 def tresh_distribution(intensity_distribution:np.ndarray,threshold:float,column_number:int=3) :
     """
