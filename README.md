@@ -1,8 +1,8 @@
 # organoid
 
-[![License MIT](https://img.shields.io/pypi/l/organoid.svg?color=green)](https://github.com/GuignardLab/organoid/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/organoid.svg?color=green)](https://pypi.org/project/organoid)
-[![Python Version](https://img.shields.io/pypi/pyversions/organoid.svg?color=green)](https://python.org)
+[![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/organoid/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/organoid)
+[![Python Version](https://img.shields.io/pypi/pyversions/tapenade.svg?color=green)](https://python.org)
 [![tests](https://github.com/GuignardLab/organoid/workflows/tests/badge.svg)](https://github.com/GuignardLab/organoid/actions)
 [![codecov](https://codecov.io/gh/GuignardLab/organoid/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/organoid)
 
@@ -28,7 +28,7 @@ pip install organoid
 To install latest development version :
 
 ```shell
-pip install git+https://github.com/GuignardLab/organoid.git
+pip install git+https://github.com/GuignardLab/tapenade.git
 ```
 
 ## Contributing

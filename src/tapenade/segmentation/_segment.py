@@ -10,7 +10,7 @@ except ImportError:
 import os
 from pathlib import Path
 
-from organoid.utils import change_voxelsize
+from tapenade.utils import change_voxelsize
 
 np.random.seed(6)
 lbl_cmap = random_label_cmap

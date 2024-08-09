@@ -1,5 +1,5 @@
 import numpy as np
-from organoid.reconstruction import (
+from tapenade.reconstruction import (
     manual_registration_fct,
 )
 from scipy import ndimage as ndi

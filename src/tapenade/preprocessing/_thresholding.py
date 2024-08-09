@@ -7,7 +7,7 @@ from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.morphology import convex_hull_image
 from skimage.transform import resize, rescale
-from organoid.preprocessing._smoothing import _smooth_gaussian
+from tapenade.preprocessing._smoothing import _smooth_gaussian
 from time import time
 
 

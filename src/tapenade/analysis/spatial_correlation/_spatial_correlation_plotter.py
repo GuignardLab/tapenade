@@ -5,7 +5,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from skimage.measure import regionprops
 from skimage.filters import threshold_otsu
 
-import organoid.utils as utils
+import tapenade.utils as utils
 
 
 class SpatialCorrelationPlotter:
@@ -62,7 +62,8 @@ class SpatialCorrelationPlotter:
             label_Y: str = 'Y',
             colormap: str = 'plasma',
             sample_fraction: float = 0.005,
-            display_quadrants: bool = False
+            display_quadrants: bool = False,
+            fig_ax_tuple: tuple = None
     ):
         
         quantity_X = self.quantity_X.copy()
@@ -89,7 +90,11 @@ class SpatialCorrelationPlotter:
             bins[1] = np.linspace(extent_Y[0], extent_Y[1], bins[1]+1)
 
         bins = list(bins)
-        fig, ax = plt.subplots(figsize=figsize)
+
+        if fig_ax_tuple is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        else:
+            fig, ax = fig_ax_tuple
 
         if log_scale_X:
             bins[0] = np.logspace(np.log10(extent_X[0]), np.log10(extent_X[1]), bins[0])
@@ -205,7 +210,7 @@ class SpatialCorrelationPlotter:
         x = np.array([xedges[0], xedges[-1]])
         lin_fit = intercept + slope*x
         ax.plot(x, lin_fit, c='red', lw=3, 
-                label=f"Y = {slope:.1E} X + {intercept:.1E}, R²={r2:.2f}")
+                label=f"Y = {slope:.1E} X + {intercept:.1E},\nR²={r2:.2f}")
         ax.legend(fontsize=10)
 
     def _display_quadrants(self, ax, quantity_X, quantity_Y):

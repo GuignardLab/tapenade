@@ -8,13 +8,13 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from typing import Optional, Tuple, Union
 
-from organoid.preprocessing._isotropize import _make_array_isotropic
-from organoid.preprocessing._local_equalization import _local_equalization
-from organoid.preprocessing._thresholding import _compute_mask
-from organoid.preprocessing._axis_alignment import (
+from tapenade.preprocessing._isotropize import _make_array_isotropic
+from tapenade.preprocessing._local_equalization import _local_equalization
+from tapenade.preprocessing._thresholding import _compute_mask
+from tapenade.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
-from organoid.preprocessing._intensity_normalization import _normalize_intensity
+from tapenade.preprocessing._intensity_normalization import _normalize_intensity
 
 """
 #! TODO:
@@ -580,12 +580,14 @@ def crop_array_using_mask(
     # Get the mask slice
     mask_slice = regionprops(mask_for_slice.astype(int))[0].slice
 
+    mask_zyx_shape = mask.shape[1:] if is_temporal else mask.shape
+
     # Add margin to the slice if specified
     if margin > 0:
         mask_slice = tuple(
             slice(
                 max(0, mask_slice[i].start - margin),
-                min(mask_slice[i].stop + margin, mask.shape[i + 1]),
+                min(mask_slice[i].stop + margin, mask_zyx_shape[i]),
             )
             for i in range(3)
         )
