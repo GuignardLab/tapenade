@@ -13,7 +13,7 @@ except ImportError:
 import os
 from pathlib import Path
 
-from tapenade.preprocessing.preprocessing import make_array_isotropic
+from tapenade.preprocessing import make_array_isotropic
 
 
 def predict_stardist(
