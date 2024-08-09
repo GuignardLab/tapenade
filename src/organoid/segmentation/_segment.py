@@ -1,11 +1,12 @@
 import numpy as np
+import warnings
 
 try:
     from csbdeep.utils import normalize
     from stardist import random_label_cmap
     from stardist.models import StarDist3D
 except ImportError:
-    print("Please install the required packages: pip install stardist csbdeep")
+    warnings.warn("Please install the required packages: pip install stardist csbdeep")
 
 import os
 from pathlib import Path
