@@ -1,12 +1,12 @@
-# organoid
+# Tapenade : Thorough Analysis PiEliNe for Advanced DEep imaging
 
-[![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/organoid/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/organoid)
+[![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/tapenade/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/tapenade)
 [![Python Version](https://img.shields.io/pypi/pyversions/tapenade.svg?color=green)](https://python.org)
-[![tests](https://github.com/GuignardLab/organoid/workflows/tests/badge.svg)](https://github.com/GuignardLab/organoid/actions)
-[![codecov](https://codecov.io/gh/GuignardLab/organoid/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/organoid)
+[![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
+[![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
-A repository to process organoid images.
+A repository to process 3D organoid images acquired with deep imaging microscopy.
 
 This repository has been developed by (in alphabetical order):
 
@@ -19,10 +19,10 @@ This repository has been developed by (in alphabetical order):
 
 ## Installation
 
-You can install `organoid` via [pip]:
+You can install `tapenade` via [pip]:
 
 ```shell
-pip install organoid
+pip install tapenade
 ```
 
 To install latest development version :
@@ -39,7 +39,7 @@ the coverage at least stays the same before you submit a pull request.
 ## License
 
 Distributed under the terms of the [MIT] license,
-"organoid" is free and open source software
+"tapenade" is free and open source software
 
 ## Issues
 
@@ -57,4 +57,4 @@ This library was generated using [Cookiecutter] and a custom made template based
 [tox]: https://tox.readthedocs.io/en/latest/
 [pytest]: https://docs.pytest.org/
 
-[file an issue]: https://github.com/GuignardLab/organoid/issues
+[file an issue]: https://github.com/GuignardLab/tapenade/issues
