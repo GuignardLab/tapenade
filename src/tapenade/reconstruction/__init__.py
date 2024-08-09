@@ -1,10 +1,11 @@
 from ._reconstruct import (
     add_centermass,
-    associate_top_bottom,
+    associate_positions,
     check_napari,
     create_folders,
     extract_positions,
     fuse_sides,
+    transformation_from_plugin,
     manual_registration_fct,
     plot_positions,
     register,
@@ -16,7 +17,8 @@ from ._reconstruct import (
 __all__ = (
     "extract_positions",
     "plot_positions",
-    "associate_top_bottom",
+    "associate_positions",
+    "transformation_from_plugin"
     "manual_registration_fct",
     "register",
     "create_folders",

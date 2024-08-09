@@ -4,27 +4,28 @@ import math
 import os
 from pathlib import Path
 from xml.dom import minidom
-
+import tifffile
 import matplotlib.pyplot as plt
 import napari
 import numpy as np
 import registrationtools
-import tifffile
+import io
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.transform import Rotation
 from skimage.measure import regionprops
-
+from skimage import io
+import transforms3d._gohlketransforms as tg
 
 def extract_positions(path_positions: str):
     """
-    Extract the positions of the objects from the xml file (saved during the acquisition)
+    Extract the X and Y positions of the objects from the xml file (saved during the acquisition) and put them in a list
     Parameters
     ----------
     path_positions : str
         path to the xml file
     """
-    positions = minidom.parse(path_positions)
-
+    print(path_positions)
+    positions = minidom.parse(str(path_positions)) #need to convert the path to a string, otherwise minidom does not work for Windows paths
     pos_x = positions.getElementsByTagName("dXPosition")
     pos_y = positions.getElementsByTagName("dYPosition")
 
@@ -37,69 +38,67 @@ def extract_positions(path_positions: str):
 
     return (xpos, ypos)
 
-
-def plot_positions(path_bottom_positions: str, path_top_positions: str):
+def plot_positions(path_ref_positions: str, path_float_positions: str):
     """
     Plot the positions of the objects from the xml file, to visualize and manually check what number have to be associated
     Parameters
     ----------
-    path_bottom_positions : str
-        path to the xml file for the bottom view
-    path_top_positions : str
-        path to the xml file for the top view
+    path_ref_positions : str
+        path to the xml file for the reference view
+    path_float_positions : str
+        path to the xml file for the floating view
 
     """
-    (xpos_b, ypos_b) = extract_positions(path_bottom_positions)
-    (xpos_t, ypos_t) = extract_positions(path_top_positions)
+    (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
+    (xpos_float, ypos_float) = extract_positions(path_float_positions)
 
-    list_number_b = [
-        i + 1 for i in range(len(xpos_b))
+    list_number_ref = [
+        i + 1 for i in range(len(xpos_ref))
     ]  # the objects will have an index going from 1 to the total number, instead of having the id chosen during the aquisition. Problem ?
     fig, ax = plt.subplots()
-    ax.scatter(xpos_b, ypos_b, label="bottom")
+    ax.scatter(xpos_ref, ypos_ref, label="ref")
 
-    for i, txt in enumerate(list_number_b):
-        ax.annotate(txt, (xpos_b[i], ypos_b[i]))
+    for i, txt in enumerate(list_number_ref):
+        ax.annotate(txt, (xpos_ref[i], ypos_ref[i]))
 
-    list_number_t = [i + 1 for i in range(len(xpos_t))]
-    ax.scatter(xpos_t, -ypos_t, label="top")
+    list_number_float = [i + 1 for i in range(len(xpos_float))]
+    ax.scatter(xpos_float, ypos_float, label="float")
 
-    for i, txt in enumerate(list_number_t):
-        ax.annotate(txt, (xpos_t[i], -ypos_t[i]))
+    for i, txt in enumerate(list_number_float):
+        ax.annotate(txt, (xpos_float[i], ypos_float[i]))
 
     plt.legend()
 
-
-def associate_top_bottom(path_bottom_positions: str, path_top_positions: str):
+def associate_positions(path_ref_positions: str, path_float_positions: str):
     """
-    Associate the objects from the bottom view with the objects from the top view, by solving a linear sum assignement between the two distribution
+    Associate the objects from the reference view with the objects from the floating view, by solving a linear sum assignement between the two distribution
     Parameters
     ----------
-    path_bottom_positions : str
-        path to the xml file for the bottom view
-    path_top_positions : str
-        path to the xml file for the top view
+    path_ref_positions : str
+        path to the xml file for the ref view
+    path_float_positions : str
+        path to the xml file for the float view
 
     Returns
     -------
-    2 lists of indices, bottom then top, sorted according to the asssgnement
+    2 lists of indices, ref then float, sorted according to the asssgnement
 
     """
-
-    (xpos_b, ypos_b) = extract_positions(path_bottom_positions)
-    (xpos_t, ypos_t) = extract_positions(path_top_positions)
-
-    cost = np.zeros((len(xpos_b), len(xpos_t)))
-    for i in range(len(xpos_b)):
-        for j in range(len(xpos_t)):
+    
+    (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
+    (xpos_float, ypos_float) = extract_positions(path_float_positions)
+    ypos_float=-ypos_float
+    cost = np.zeros((len(xpos_ref), len(xpos_float)))
+    for i in range(len(xpos_ref)):
+        for j in range(len(xpos_float)):
             cost[i, j] = math.sqrt(
-                math.pow(xpos_b[i] - xpos_t[j], 2)
-                + math.pow(ypos_b[i] - ypos_t[j], 2)
+                math.pow(xpos_ref[i] - xpos_float[j], 2)
+                + math.pow(ypos_ref[i] - ypos_float[j], 2)
             )
     row_ind, col_ind = linear_sum_assignment(cost)
-
-    return (list(row_ind + 1), list(col_ind + 1))
-
+    list_row = [int(i) for i in list(row_ind + 1)]
+    list_col = [int(i) for i in list(col_ind + 1)]
+    return (list_row,list_col)
 
 def create_folders(
     folder_experiment: str,
@@ -142,54 +141,77 @@ def create_folders(
         os.mkdir(os.path.join(folder_sample, "registered"))
         os.mkdir(os.path.join(folder_sample, "fused"))
 
-        image_ref = tifffile.imread(
+        image_ref = io.imread(
             Path(folder_experiment) / f"{filename_ref}.tif"
         )
-        image_float = tifffile.imread(
+        image_float = io.imread(
             Path(folder_experiment) / f"{filename_float}.tif"
         )
+        
         for ind_ch, ch in enumerate(channels):
-            tifffile.imwrite(
+            imref = (image_ref[:, :, :,ind_ch])
+            imfloat = (image_float[:,:,:,ind_ch])
+            io.imsave(
                 Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
-                image_ref[:, ind_ch, :, :],
+                imref, ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
             )  # ,imagej=True, metadata={'axes': 'TZYX'})
-            tifffile.imwrite(
+            io.imsave(
                 Path(folder_sample) / "raw" / f"{filename_float}_{ch}.tif",
-                image_float[:, ind_ch, :, :],
+                imfloat,
             )  # ,imagej=True, metadata={'axes': 'TZYX'})>
 
+def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
+    """
+    Extract the transformation from the json file saved by the plugin
+    Parameters
+    ----------
+    path_json : str
+        path to the json file
+    scale : tuple, optional
+        scale of the image, by default (1,1,1)
+    """
+    with open(path_json) as f:
+        data = json.load(f)
+    rot_z = data["rot_z"]
+    rot_y = data["rot_y"]
+    rot_x = data["rot_x"]
+    trans_z = data["trans_z"]
+    trans_y = data["trans_y"]
+    trans_x = data["trans_x"]
+    #in the napari plugin, the translation computed is the one after the rotation, so we need to set the translation trans1 before rotation to 0
+    init_trsfs = list_init_trsf(trans1=[0, 0, 0], trans2=[trans_z, trans_y, trans_x], rot=[rot_x, rot_y, rot_z], scale=scale)
+    return (init_trsfs)
 
 def manual_registration_fct(
     reference_landmarks, floating_landmarks, scale: tuple = (1, 1, 1)
 ):
     # stolen from https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py
     """
-    Finds the transformation between 2 sets of points in 3D.
-    If the automatic registration can't find an accurate transformation :
-    -open your bottom and top images on a visualization software (eg Napari) and create 2 label images of the same shape, one will contain the landmarks for the bottom image and the other for the top image.
-    -add landmarks, preferentially sphere on the objects you can identify on both sides. Each object needs to have the same label on both sides, top and botttom. The more landmarks, the better.
-    -then gives these 2 label arrays to the function manual_registration_fct, it will compute the transformation between the two sets of points
+    Finds the transformation between 2 sets of labels in 3D.
+    If the automatic registration can't find an accurate transformation, 2 options :
+    1) create landmarks layers using the napari plugin manual-registration, and save the values of rotation and transaltion into a json file that you will give as the argument "input_init_trsf_from_plugin" to the function register
+    2) using another software to create 2 arays of the same size as your original images (without channels) and labels of the same values fot the 2 views. Save these arrays as tif files, and give them as arguments to this function.
 
     Parameters
     ----------
     reference_landmarks : np.array
-        This image will be the reference, the 'fixed' one
+        Landmarks for the reference image
     floating_landmarks : np.array
-        This image will be the floating image, the one that will be registered onto the reference image
+        Landmarks for the floating image
 
     Returns
     -------
-    translation and rotation to apply to the top image to register it on the bottom image
-    In the following order : rotation_z, rotation_y, rotation_x, translation_z, translation_y, translation_x.
+    translation and rotation to apply to the floating image to register it on the reference image
+    In the following order : rotation, translation1, translation2 with translation1 the translation to apply before rotation and translation2 the translation to apply after rotation
     """
 
     rg_ref = regionprops(reference_landmarks)
-    centroids_ref = np.array([prop.centroid for prop in rg_ref]).T
-    centroids_ref = centroids_ref * scale
+    centroids_ref = np.array([prop.centroid for prop in rg_ref])
+    centroids_ref = (centroids_ref * scale).T
 
     rg_float = regionprops(floating_landmarks)
-    centroids_float = np.array([prop.centroid for prop in rg_float]).T
-    centroids_float = centroids_float * scale
+    centroids_float = np.array([prop.centroid for prop in rg_float])
+    centroids_float = (centroids_float * scale).T
 
     assert centroids_ref.shape == centroids_float.shape
 
@@ -242,23 +264,93 @@ def manual_registration_fct(
     center_image = (np.array(reference_landmarks.shape) / 2) * scale
     translation1 = center_image - centermass_float
     translation2 = centermass_ref - center_image
-    return (rotation_angles, translation1, translation2)
+    return (list(rotation_angles), list(translation1), list(translation2)) #into list to be able to copy paste directly into the registration function
 
+def list_init_trsf(trans1,trans2,rot):
+    """
+    Transforms the individual values of rotation and translation into a list of transformations to apply in the right order. This list can be given as the parameter other_trsf to the function register
+    Parameters
+    ----------
+    trans1 : list
+        list of the translations to apply to the floating image BEFORE ROTATION
+    trans2 : list   
+        list of the translations to apply to the floating image AFTER ROTATION
+    rot : list  
+        list of the rotations to apply to the floating image
+    """
+
+    trans2_in_um=trans2
+    trans1_in_um=trans1
+    init_trsf = [
+            [
+                "trans",
+                "X",
+                -trans1_in_um[2],
+                "trans",
+                "Y",
+                -trans1_in_um[1],
+                "trans",
+                "Z",
+                -trans1_in_um[0],
+                "rot",
+                "X",
+                -rot[0],
+                "rot",
+                "Y",
+                -rot[1],
+                "rot",
+                "Z",
+                -rot[2],
+                "trans",
+                "X",
+                -trans2_in_um[2],
+                "trans",
+                "Y",
+                -trans2_in_um[1],
+                "trans",
+                "Z",
+                -trans2_in_um[0],
+            ]
+        ]
+    return(init_trsf)
+
+def compute_transformation_from_trsf_files(path_trsf:str):
+        
+    f = open(Path(path_trsf) / "A1-rigid.trsf", 'r')
+
+    # Read and ignore header lines (NECESSARY)
+    header1 = f.readline()
+    header2 = f.readline()
+
+    matrix=np.zeros((4,4))
+
+    index=0;
+    for line in f:
+        line = line.strip()
+        columns = line.split()
+        if index<4:
+            matrix[index,:] = np.array(columns, dtype=float)
+        index=index+1
+        
+    scale, shear, angles, trans, persp = tg.decompose_matrix(matrix)
+    angles_deg=[math.degrees(angles[0]), math.degrees(angles[1]), math.degrees(angles[2])]
+    print("rotation angles (X,Y,Z) in deg:",angles_deg)
+    print("translation vector:",trans)
 
 def register(
     path_data: str,
     path_transformation: str,
     path_registered_data: str,
-    path_to_bin: str,
     reference_image: str,
     floating_image: str,
-    input_voxel: tuple = [1, 1, 1],
-    output_voxel: tuple = [1, 1, 1],
+    input_voxel: list = [1, 1, 1],
+    output_voxel: list = [1, 1, 1],
     compute_trsf: int = 1,
     trans1: list = None,
     rot: list = None,
     trans2: list = None,
     other_trsf: list = None,
+    input_init_trsf_from_plugin: str = "",
     test_init: int = 0,
     trsf_type: str = "rigid",
     depth: int = 3,
@@ -274,13 +366,11 @@ def register(
     # Parameters
     # ----------
     # path_data : str
-    #     path to the raw images
+    #     path to the raw images. In the folder structure : folder_experiment/sample_id/raw
     # path_transformation : str
-    #     path to the folder where the transformations files are saved
+    #     path to the folder where the transformations files are saved. In the folder structure : folder_experiment/sample_id/trsf
     # path_registered_data : str
-    #     path where the registered images will be saved
-    # path_to_bin : str
-    #     path to the bin folder : necessary to save the registered data : should be something like 'C:\Users\user\Anaconda3\envs\my_environment\Library\bin'
+    #     path where the registered images will be saved. In the folder structure : folder_experiment/sample_id/registered
     # reference_image : str
     #     name of the reference image, the 'fixed' one
     # floating_image : str
@@ -288,9 +378,9 @@ def register(
     # input_voxel : tuple, optional
     #     voxel size of the input image, by default [1,1,1]
     # output_voxel : tuple, optional
-    #     voxel size of the output image, by default [1,1,1]. Can be different than the input voxel size.
+    #     voxel size of the output image, by default [1,1,1]. Can be different from the input voxel size.
     # compute_trsf : int, optional
-    #     1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as teh reference, register this channel using compute_trsf=1.
+    #     1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as the reference, register this channel using compute_trsf=1.
     #     Then you can use compute_trsf=0, the algo will find the pre-existing transformation to register the other channels onto the reference channel.
     # rot : list, optional
     #     list of the rotations to apply to the floating image, by default [0,0,0]
@@ -302,17 +392,26 @@ def register(
     #     list of transformations to apply to the floating image, by default [], if you want give direclty your transformations.
     #     If this argument is not None, the value of the parameters rot, trans1, trans2 will be ignored.
     #     You can use flipping (flip), rotations (rot), translation (trans). Specify the axis X,Y or Z after the sample_id of the transformation. For rotations and translation, precise the value (angle or distance) after the axis.
-    #     Needs 2 sets of brackets.
+    #     IMPORTANT : Needs 2 sets of brackets.
     #     If order_init_trsfs is True, the transformations will be applied in the order they are given in the list init_trsfs.
     #     # Example : [['flip', 'Z', 'trans', 'Z', -10,'trans','Y',100,'rot','X',-29,'rot','Y',41,'rot','Z',-2]]
+    # input_init_trsf_from_plugin : str, optional
+    #     path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file no matter the parameters rot, trans1, trans2 or other_trsf
+    # test_init : int, optional
+    #     1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0. 
     # trsf_type : str, optional
     #     type of transformation to compute : rigid, affine. By default rigid.
     # depth : int, optional
     #     depth of the registration, by default 3
     # bbox : int, optional
     #     1 if the bounding box of the original image can extend, 0 if not.
-    # save_json : bool, optional
-    #     if True, saves the parameters in a json file, in the main folder. By default False.
+    # image_interpolation : str, optional
+    #     type of interpolation to apply to the image, by default 'linear'
+    # padding : int, optional
+    #     padding to apply to the image, by default 0
+    # save_json : str
+    #     if not None, save the parameters of that function in a json file at the path given.
+    #     IMPORTANT : saves the parameters of the function, not the parameters of the registration, in particular the initial transformations only. To save the actual transformations, use the function "compute_transformation_from_trsf_files"
     # ordered_init_trsfs : bool, optional
     #     if True, the transformations will be applied in the order they are given in the list init_trsfs.
 
@@ -324,45 +423,16 @@ def register(
     if trans2 is None:
         trans2 = [0, 0, 0]
 
-    if (
-        other_trsf is not None
-    ):  # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
+    if input_init_trsf_from_plugin != "":
+    #if the user input the json file from the plugin, the json file is used as init trsf no matter the parameters rot, trans1, trans 2 or other_trsf
+        init_trsfs=transformation_from_plugin(input_init_trsf_from_plugin,scale=input_voxel)
+    elif input_init_trsf_from_plugin == "" and other_trsf is not None:
+        print('other_trsf',other_trsf)
+    # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
         init_trsfs = other_trsf
-    else:  # is the user did not precise other_trsf, then we use the parameters rot, trans1 and trans2 to "build" init_trsfs.
-
-        init_trsfs = [
-            [
-                "trans",
-                "X",
-                -trans1[2],
-                "trans",
-                "Y",
-                -trans1[1],
-                "trans",
-                "Z",
-                -trans1[0],
-                "rot",
-                "X",
-                -rot[0],
-                "rot",
-                "Y",
-                -rot[1],
-                "rot",
-                "Z",
-                -rot[2],
-                "trans",
-                "X",
-                -trans2[2],
-                "trans",
-                "Y",
-                -trans2[1],
-                "trans",
-                "Z",
-                -trans2[0],
-            ]
-        ]
+    else:  # is the user did not precise other_trsf or any json file, then we use the parameters rot, trans1 and trans2 to "build" init_trsfs.
+        init_trsfs = list_init_trsf(trans1=trans1,trans2=trans2,rot=rot)
     data = {
-        "path_to_bin": path_to_bin,  # necessary to register the data
         "path_to_data": str(path_data),
         "ref_im": reference_image,
         "flo_ims": [floating_image],
@@ -390,13 +460,11 @@ def register(
         json_string = json.dumps(data, indent=4)
         with open(Path(save_json) / "parameters.json", "w") as outfile:
             outfile.write(json_string)
-
     tr = registrationtools.SpatialRegistration(data)
     tr.run_trsf()
 
-
 def check_napari(
-    path_data: str,
+    folder: str,
     reference_image,
     floating_image,
     additional_images: list = None,
@@ -409,8 +477,8 @@ def check_napari(
 
     Parameters
     ----------
-    path_data : str
-        path to the registered images
+    folder : str
+        path to the main folder. The floating image is always saved in the folder 'registered' but not the reference image.
     reference_image : str or ndarray (can be the name of the array in path_data or the array itself)
         name of the reference image, the 'fixed' one
     floating_image : str or ndarray (can be the name of the array in path_data or the array itself)
@@ -419,24 +487,27 @@ def check_napari(
         list of additional images to add to the viewer, by default []
     scale : tuple, optional
         scale of the image (should be the same ), by default (1,1,1)
+    labels : bool, optional
+        if True, the images are considered as labels, by default False
+
     """
 
     viewer = napari.Viewer()
     if isinstance(reference_image, (str | Path)):
         if os.path.exists(
-            Path(path_data) / "registered" / reference_image
+            Path(folder) / "registered" / reference_image
         ):  # if the bounding box or voxel size has changed, then the reference image has been saved as an output.
-            ref_im = tifffile.imread(
-                Path(path_data) / "registered" / reference_image
+            ref_im = io.imread(
+                Path(folder) / "registered" / reference_image
             )
         else:  # if the bbox did not change, the reference image has not changed and is found in the raw folder only.
-            ref_im = tifffile.imread(Path(path_data) / "raw" / reference_image)
+            ref_im = io.imread(Path(folder) / "raw" / reference_image)
     else:
         ref_im = reference_image
 
     if isinstance(floating_image, (str | Path)):
-        float_im = tifffile.imread(
-            Path(path_data) / "registered" / floating_image
+        float_im = io.imread(
+            Path(folder) / "registered" / floating_image
         )
     else:
         float_im = floating_image
@@ -471,16 +542,13 @@ def check_napari(
 
     napari.run()
 
-
-def sigmoid(x, x0, p):
+def sigmoid(z, z0, p):
     """
     Sigmoid function, to weight the images by the distance to the edges
     z0 gives the middle of the sigmoid, at which weight=0.5
     p gives the slope. 5 corresponds to a low slope, wide fusion width and 25 to a strong slope, very thin fusion width.
     """
-    # for z in range(len(z)) :
-    return 1 / (1 + np.exp(-p * (x - x0)))
-
+    return 1 / (1 + np.exp(-p * (z - z0)))
 
 def fuse_sides(
     path_registered_data: str,
@@ -490,7 +558,7 @@ def fuse_sides(
     name_output: str = "fusion",
     slope_coeff: int = 20,
     axis: int = 0,
-    return_image=False,
+    return_image=False
 ):
     """
     Fuse the two sides of the sample, using the previously registered images
@@ -516,24 +584,21 @@ def fuse_sides(
     """
 
     ###Takes the previously saved images (two registered sides)
-    if isinstance(reference_image_reg, (str | Path)):
-        ref_image = tifffile.imread(
+    if isinstance(reference_image_reg, (str | Path)): #if the reference image is a string, then we load the image from the path
+        ref_image = io.imread(
             Path(path_registered_data) / reference_image_reg
         )
-    else:
-        ref_image = ref_image
-
+    #else its the image itself
     if isinstance(floating_image_reg, (str | Path)):
-        float_image = tifffile.imread(
+        float_image = io.imread(
             Path(path_registered_data) / floating_image_reg
         )
-    else:
-        float_image = float_image
 
+    dtype_input=float_image.dtype
     mask_r = ref_image > 0
     mask_f = float_image > 0
     mask_fused = mask_r & mask_f
-    cumsum = np.cumsum(mask_fused, axis=axis).astype(np.float16)
+    cumsum = np.cumsum(mask_fused, axis=axis)
     # we take the cumulative sum  along the fusion axis, this will give me a linear weight.
     cumsum_normalized = cumsum / np.max(cumsum)
 
@@ -541,17 +606,14 @@ def fuse_sides(
     w2 = sigmoid(cumsum_normalized, x0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
-    fusion = (ref_image * w1 + float_image * w2).astype(np.uint16)
+    fusion = (ref_image * w1 + float_image * w2)
 
     if return_image:
         return fusion
-
-    tifffile.imwrite(Path(folder_output) / name_output, fusion)
-
+    io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
 
 def write_hyperstacks(
-    path: str, sample_id: str, channels: list, return_image=False
-):
+    path: str, sample_id: str, channels: list, return_image=False,dtype=np.float32):
     """
     Writes the hyperstacks, by stacking the channels of the registered images
 
@@ -567,23 +629,20 @@ def write_hyperstacks(
         if True, returns the hyperstack, by default False
     """
 
-    image = tifffile.imread(
-        Path(path) / f"{sample_id}_{channels[0]}.tif", dtype=np.int16
-    )  # reading one image just to extract the shape of the image and initialize the hyperstack
-    (z, x, y) = image.shape
-    new_image = np.zeros((z, len(channels), x, y))
-
+    image = io.imread(
+        Path(path) / f"{sample_id}_{channels[0]}.tif")  # reading one image just to extract the shape of the image and initialize the hyperstack
+    (z, y, x) = image.shape
+    new_image = np.zeros((z, y, x,len(channels)))
     for ch in range(len(channels)):
-        one_channel = tifffile.imread(
-            Path(path) / f"{sample_id}_{channels[ch]}.tif",
-            dtype=np.int16,
-        )
-        new_image[:, ch, :, :] = one_channel
+        one_channel = io.imread(
+            Path(path) / f"{sample_id}_{channels[ch]}.tif")
+        print(one_channel.shape)
+        new_image[:, :, :,ch] = one_channel
 
     if return_image:
         return new_image
 
-    tifffile.imwrite(Path(path) / f"{sample_id}_registered.tif", new_image)
+    tifffile.imwrite(Path(path) / f"{sample_id}_registered.tif", new_image.astype(dtype), imagej=True, compression=('zlib', 1))#float16 not compatible with Fiji
 
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
@@ -596,6 +655,8 @@ def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
         array containing the landmarks (can be float or reference)
     radius : int, optional
         radius of the sphere to add around the center of mass, by default 10
+    centermass_label : int, optional
+        value of the label of the center of mass, by default 10 (arbitrary)
     """
 
     rg = regionprops(landmarks)
@@ -608,23 +669,7 @@ def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
     ] = centermass_label
     return landmarks
 
-
 def remove_previous_files(path):
     filelist = glob.glob(os.path.join(path, "*.tif"))
     for f in filelist:
         os.remove(f)
-
-
-def reconstruct_foo():
-    print("reconstruct")
-    return -1
-
-
-def pipeline_reconstruction(*args):  # image1, image2, sigma, ...
-    print(*args)
-
-
-def script_run():
-
-    # Parse the arguments
-    pipeline_reconstruction(1, 2, 3, 4, 5)
