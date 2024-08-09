@@ -7,7 +7,7 @@ from skimage.measure import block_reduce
 from pathlib import Path
 from glob import glob
 import numpy as np
-from organoid import analysis
+from tapenade import analysis
 import os
 
 #Reading all the data in one folder
