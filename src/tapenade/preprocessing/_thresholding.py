@@ -93,41 +93,6 @@ def _otsu_threshold_binarization(
     return binary_mask
 
 
-def _histomin_threshold_binarization(
-    image: np.ndarray, sigma_blur: float, threshold_factor: float
-) -> np.ndarray:
-    """
-    Threshold image based on histogram values.
-
-    Parameters:
-    - image: numpy array, input image
-    - sigma_blur: float, standard deviation of the Gaussian blur.
-    - threshold_factor: float, factor to multiply the threshold
-
-    Returns:
-    - binary_mask: numpy array, binary mask computed using histogram thresholding
-    """
-
-    blurred = gaussian_filter(image, sigma=sigma_blur)
-
-    freqs, bins = np.histogram(blurred.ravel(), bins=256)
-
-    # # Smooth the histogram using a uniform filter
-    # freqs = uniform_filter(np.log(1 + freqs), 16, mode="nearest")
-
-    # Find the local minima in the smoothed histogram
-    threshold_candidates_args = argrelextrema(freqs, np.less_equal, order=1)[0]
-    threshold_candidates_args = threshold_candidates_args[
-        np.nonzero(threshold_candidates_args)
-    ]
-
-    # Select the threshold value as the first frequency minimum
-    threshold = bins[threshold_candidates_args[0]] * threshold_factor
-
-    # Create a binary mask
-    binary_mask = blurred > threshold
-
-    return binary_mask
 
 
 ### POST-PROCESSING FUNCTIONS
@@ -261,7 +226,7 @@ def _compute_mask(
     Parameters:
     - image: numpy array, input image
     - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
-      'otsu' for Otsu's thresholding, or 'histomin' for Histogram Minimum thresholding.
+      or 'otsu' for Otsu's thresholding.
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold
@@ -286,10 +251,6 @@ def _compute_mask(
         )
     elif method == "otsu":
         mask = _otsu_threshold_binarization(
-            im / im.max(), sigma_blur, threshold_factor
-        )
-    elif method == "histogram min":
-        mask = _histomin_threshold_binarization(
             im / im.max(), sigma_blur, threshold_factor
         )
     else:

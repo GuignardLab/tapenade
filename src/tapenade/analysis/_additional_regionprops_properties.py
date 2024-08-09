@@ -1,5 +1,6 @@
-import numpy as np
 import numba
+import numpy as np
+
 
 def add_tensor_moment(regionprops_prop, scale):
 
