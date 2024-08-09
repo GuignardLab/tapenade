@@ -22,7 +22,7 @@ push = false
 "pyproject.toml" = [
     'current_version = "{version}"',
 ]
-"src/organoid/__init__.py" = [
+"src/tapenade/__init__.py" = [
     '__version__ = "{version}"',
 ]
 "setup.cfg" = [

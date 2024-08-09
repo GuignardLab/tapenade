@@ -1,4 +1,4 @@
-# from organoid.segmentation import predict_stardist
+# from tapenade.segmentation import predict_stardist
 # import numpy as np
 
 # def test_pred():
