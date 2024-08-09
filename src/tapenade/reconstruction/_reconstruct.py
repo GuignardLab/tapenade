@@ -336,6 +336,7 @@ def compute_transformation_from_trsf_files(path_trsf:str):
     angles_deg=[math.degrees(angles[0]), math.degrees(angles[1]), math.degrees(angles[2])]
     print("rotation angles (X,Y,Z) in deg:",angles_deg)
     print("translation vector:",trans)
+
 def register(
     path_data: str,
     path_transformation: str,
