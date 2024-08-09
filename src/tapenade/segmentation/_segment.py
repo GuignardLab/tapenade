@@ -1,11 +1,13 @@
 import numpy as np
+from tqdm import tqdm
+import warnings
 
 try:
     from csbdeep.utils import normalize
     from stardist import random_label_cmap
     from stardist.models import StarDist3D
 except ImportError:
-    print("Please install the required packages: pip install stardist csbdeep")
+    warnings.warn("Please install the required packages: pip install stardist csbdeep")
 
 import os
 from pathlib import Path
@@ -86,12 +88,12 @@ def find_seg_errors(segmentation:np.ndarray,image:np.ndarray):
 
     return (Intensity_Distrib)
 
-def tresh_distribution(Intensity_Distrib:np.ndarray,threshold:float,column_number:int=3) :
+def tresh_distribution(intensity_distribution:np.ndarray,threshold:float,column_number:int=3) :
     """
     Thresholds the Distribution to find labels that could be wrong segmentation.
 
     Parameters :
-    Intensity_Distrib: Array computed with the function find_seg_errors, that shows average intensity, std and std/mean for each label of the distrbution
+    intensity_distribution: Array computed with the function find_seg_errors, that shows average intensity, std and std/mean for each label of the distrbution
     threshold : threshold value above which cell will be considered wrong. To get an idea, visualize the distrbution (examples are in the notebooks)
     column_number : index to consider for thre threshold.
                     If you want to discrimnate on the mean intensity of the ROI, choose 1.
@@ -105,8 +107,8 @@ def tresh_distribution(Intensity_Distrib:np.ndarray,threshold:float,column_numbe
 
 
     id_merged_cells=[]
-    for id,intensity in enumerate(Intensity_Distrib[:,column_number]) :
+    for id,intensity in enumerate(intensity_distribution[:,column_number]) :
         if intensity>threshold :
-            id_merged_cells.append(int(Intensity_Distrib[id,0]))
+            id_merged_cells.append(int(intensity_distribution[id,0]))
     return(id_merged_cells)
 
