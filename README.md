@@ -23,7 +23,7 @@ This repository has been developed by (in alphabetical order):
 
 ## Overview
 
-<img src="Fig_overview_github.png" width="1000">
+<img src="https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/Fig_overview_github.png" width="1000">
 
 The Tapenade pipeline is a tool for the analysis of dense 3D tissues acquired with deep imaging microscopy. It is designed to be user-friendly and to provide a comprehensive analysis of the data. The pipeline is composed of several steps, each of which can be run independently.
 
@@ -63,6 +63,8 @@ pip install -e .
 ```
 
 ## Usage
+
+
 
 ## Complementary Napari plugins (for graphical user interfaces)
 
