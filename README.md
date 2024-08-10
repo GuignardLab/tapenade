@@ -1,4 +1,4 @@
-# Tapenade : Thorough Analysis PiEliNe for Advanced DEep imaging
+# :herb: Tapenade : Thorough Analysis PiEliNe for Advanced DEep imaging
 
 [![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/tapenade/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/tapenade)
@@ -23,6 +23,21 @@ This repository has been developed by (in alphabetical order):
 
 ## Overview
 
+<img src="Fig_overview_github.png" width="1000">
+
+The Tapenade pipeline is a tool for the analysis of dense 3D tissues acquired with deep imaging microscopy. It is designed to be user-friendly and to provide a comprehensive analysis of the data. The pipeline is composed of several steps, each of which can be run independently.
+
+The pipeline is composed of the following methods:
+
+1. **Spectral filtering**: Given a set of calibrated emission spectra, allows the unmixing of the different fluorophores present in the image. 
+2. **Registration & fusion**: Allows for spatial fusion of two images (e.g. acquired with a dual-view microscope).
+3. **Pre-processing**: Provides many pre-processing functions, like rescaling, masking, correction of optical artifcats, etc.
+4. **Segmentation**: Detect and seperate each nuclei in the image. We provide trained weights for StarDist3D, a state-of-the-art deep learning model for nuclei segmentation.
+4. **Masked smoothing**: Produces smooth fields of a given dense or sparse quantity, which allows for multiscale analysis.
+5. **Spatial correlation analysis**: Computes a spatial correlation map between two continuous fields.
+6. **Deformation tensors analysis**: Computes deformation tensors (inertia, true strain, etc.) from segmented objects.
+
+All methods are explained in details in our Jupyter notebooks, which are available in the `notebooks` folder [here](notebooks/).
 
 
 ## Installation
@@ -33,10 +48,18 @@ You can install `tapenade` via [pip]:
 pip install tapenade
 ```
 
-To install latest development version :
+To install the latest development version:
 
 ```shell
 pip install git+https://github.com/GuignardLab/tapenade.git
+```
+
+To install the latest development version in editable mode:
+
+```shell
+git clone git@github.com:GuignardLab/tapenade.git
+cd tapenade
+pip install -e .
 ```
 
 ## Usage
