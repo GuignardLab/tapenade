@@ -623,7 +623,7 @@ def masked_gaussian_smooth(
     """
     Apply Gaussian smoothing to an image or a sequence of images.
 
-    Args:
+    Parameters:
         image (ndarray): The input image or sequence of images.
         sigmas (float or list of floats): The standard deviation(s) of the Gaussian kernel.
         mask (ndarray, optional): The mask indicating the regions of interest. Default is None.

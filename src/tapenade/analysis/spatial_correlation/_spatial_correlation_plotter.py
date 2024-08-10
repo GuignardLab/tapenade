@@ -9,8 +9,24 @@ import tapenade.utils as utils
 
 
 class SpatialCorrelationPlotter:
-    def __init__(self, quantity_X, quantity_Y, 
-                 mask=None, labels=None):
+    def __init__(self, quantity_X: np.ndarray, quantity_Y: np.ndarray, 
+                 mask: np.ndarray = None, labels: np.ndarray = None):
+        """
+        Initialize computation on two quantities X and Y before plotting
+        a heatmap of their spatial correlation. If mask is provided, the
+        computation will be restricted to the masked region. If labels are
+        provided, the computation will be restricted to the labeled regions,
+        regardless of the mask.
+
+        Parameters:
+        - quantity_X: numpy array representing the first quantity
+        - quantity_Y: numpy array representing the second quantity
+        - mask: optional numpy array, binary mask that will be applied to restrict
+            the values of quantity_X and quantity_Y
+        - labels: optional numpy array, labels of object instances (e.g nuclei) in
+            which the the values of quantity_X and quantity_Y will be averaged.
+            Each object instance will create a single point in the heatmap.
+        """
 
         if labels is not None:
             if mask is None:
@@ -65,6 +81,42 @@ class SpatialCorrelationPlotter:
             display_quadrants: bool = False,
             fig_ax_tuple: tuple = None
     ):
+        
+        """
+        Create a heatmap of the spatial correlation between two quantities X and Y.
+
+        Parameters:
+        - bins: list of two integers, number of bins in each dimension
+        - show_individual_cells: bool, if True and if labels was specified in __init__, 
+            individual cells will be displayed as a scatter plot on top of the heatmap.
+        - show_linear_fit: bool, if True, a linear fit will be displayed on the heatmap.
+        - normalize_quantities: bool, if True, the quantities will be normalized to have
+            zero mean and unit standard deviation.
+        - extent_X: tuple of two floats, the extent of the X axis
+        - extent_Y: tuple of two floats, the extent of the Y axis
+        - percentiles_X: tuple of two floats, only the values of X between these percentiles
+            will be considered
+        - percentiles_Y: tuple of two floats, the percentiles of Y between thse percentiles
+            will be considered
+        - log_scale_X: bool, if True, the X axis will be displayed in log scale
+        - log_scale_Y: bool, if True, the Y axis will be displayed in log scale
+        - figsize: tuple of two floats, the size of the figure
+        - label_X: str, the label of the X axis
+        - label_Y: str, the label of the Y axis
+        - colormap: str, the name of the colormap
+        - sample_fraction: float, if labels has not been specified in __init__, sample_fraction
+            represents the fraction of the total number of values of X and Y that will be 
+            randomly selected to be used for the computation of the statistics.
+        - display_quadrants: bool, if True, quadrants will be displayed as vertical and horizontal
+            dashed lines at the Otsu thresholds of X and Y.
+        - fig_ax_tuple: tuple of matplotlib figure and axis, if not None, the heatmap will be
+            displayed on the provided figure and axis.
+
+        Returns:
+        - fig: matplotlib figure
+        - ax: matplotlib axis 
+
+        """
         
         quantity_X = self.quantity_X.copy()
         quantity_Y = self.quantity_Y.copy()
@@ -270,6 +322,13 @@ class SpatialCorrelationPlotter:
                     log_scale_X: bool = False,
                     log_scale_Y: bool = False,
                     display_quadrants: bool = False):
+        
+        """
+        Create and plot a heatmap of the spatial correlation between two 
+        quantities X and Y.
+
+        See get_heatmap_figure for the description of the parameters.
+        """
         
         fig, ax = self.get_heatmap_figure(
             bins=bins,
