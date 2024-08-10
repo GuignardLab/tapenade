@@ -1,7 +1,5 @@
 import numpy as np
 from sklearn.decomposition import PCA
-from typing import Tuple
-import numpy as np
 
 
 def _signed_angle(v1: np.ndarray, v2: np.ndarray, vn: np.ndarray) -> float:
@@ -27,7 +25,7 @@ def _compute_rotation_angle_and_indices(
     target_axis: str,
     rotation_plane: str,
     temporal_slice: slice,
-) -> Tuple[float, Tuple[int, int]]:
+) -> tuple[float, tuple[int, int]]:
     """
     Compute the rotation angle and indices for axis alignment.
 
@@ -81,12 +79,14 @@ def _compute_rotation_angle_and_indices(
     rotation_angle = (
         _signed_angle(
             major_axis_vector, target_axis_vector, plane_normal_vector
-        ) * 180 / np.pi
+        )
+        * 180
+        / np.pi
     )
 
     # respects the right-hand rule wrt the corresponding normal vector
     rotation_plane_indices = {
-        "XY": (-1,-2),
+        "XY": (-1, -2),
         "XZ": (-3, -1),
         "YZ": (-2, -3),
     }[rotation_plane]

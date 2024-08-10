@@ -1,26 +1,30 @@
-import numpy as np
-
 from functools import partial
 from os import cpu_count
+from typing import Optional, Union
+
+import numpy as np
 from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
-from typing import Optional, Tuple, Union, List
 
 from tapenade.preprocessing._array_rescaling import _change_arrays_pixelsize
-from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._thresholding import _compute_mask
 from tapenade.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
-from tapenade.preprocessing._intensity_normalization import _normalize_intensity
-from tapenade.preprocessing._smoothing import _parallel_gaussian_smooth, _masked_smooth_gaussian
-
+from tapenade.preprocessing._intensity_normalization import (
+    _normalize_intensity,
+)
+from tapenade.preprocessing._local_equalization import _local_equalization
+from tapenade.preprocessing._smoothing import (
+    _masked_smooth_gaussian,
+    _parallel_gaussian_smooth,
+)
+from tapenade.preprocessing._thresholding import _compute_mask
 
 """
 #! TODO:
-    - refactor every multiprocessing calls through a single decorator 
+    - refactor every multiprocessing calls through a single decorator
     - update notebook to reflect changes
 """
 
@@ -47,7 +51,10 @@ def _parallel_change_arrays_pixelsize(arrays, reshape_factors, order):
         order=order,
     )
 
-def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:int=0) :
+
+def isotropize_and_normalize(
+    mask, image, labels, scale, sigma: float = None, pos_ref: int = 0
+):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
     Parameters
@@ -58,52 +65,84 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:in
         image to normalize
     labels : np.array
         labels of the mask
-    scale : tuple   
+    scale : tuple
         scale factors for the isotropic transformation
-    sigma : int 
+    sigma : int
         sigma for the gaussian filter
     pos_ref : int
         position of the reference channel, starting from 0
-    Returns 
+    Returns
     -------
     norm_image : np.array
         normalized and isotropic image
     """
 
-    if len(image.shape)>3 : #if multichannel image
+    if len(image.shape) > 3:  # if multichannel image
         nb_channels = image.shape[1]
-        assert pos_ref<nb_channels, "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
-        iso_image=[]
-        liste_channels = np.linspace(0,nb_channels-1,nb_channels,dtype=int)
-        for ch in liste_channels :
-            channel = image[:,ch,:,:]
-            (mask_iso,channel_iso,seg_iso)= change_arrays_pixelsize(mask=mask,image=channel,labels=labels,input_pixelsize=scale,output_pixelsize=(1,1,1),order=1,n_jobs=-1)   
+        assert (
+            pos_ref < nb_channels
+        ), "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
+        iso_image = []
+        liste_channels = np.linspace(
+            0, nb_channels - 1, nb_channels, dtype=int
+        )
+        for ch in liste_channels:
+            channel = image[:, ch, :, :]
+            (mask_iso, channel_iso, seg_iso) = change_arrays_pixelsize(
+                mask=mask,
+                image=channel,
+                labels=labels,
+                input_pixelsize=scale,
+                output_pixelsize=(1, 1, 1),
+                order=1,
+                n_jobs=-1,
+            )
             iso_image.append(channel_iso)
 
         iso_image = np.array(iso_image)
-        iso_image=iso_image.transpose(1,0,2,3) #stay in convention ZCYX
-        
-        ref_channel = iso_image[:,pos_ref,:,:] #should check before if pos_ref>=iso_image.shape[1]
-        liste_float_channels = np.delete(liste_channels,pos_ref)
+        iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
+
+        ref_channel = iso_image[
+            :, pos_ref, :, :
+        ]  # should check before if pos_ref>=iso_image.shape[1]
+        liste_float_channels = np.delete(liste_channels, pos_ref)
         norm_image = np.zeros_like(iso_image)
         for ch_float in liste_float_channels:
-            channel = iso_image[:,ch_float,:,:]
-            channel_norm,ref_norm = normalize_intensity(image=channel,ref_image=ref_channel,mask=mask_iso,labels=seg_iso,sigma=sigma)
-            norm_image[:,ch_float,:,:]=channel_norm
-        norm_image[:,pos_ref,:,:] = ref_norm
+            channel = iso_image[:, ch_float, :, :]
+            channel_norm, ref_norm = normalize_intensity(
+                image=channel,
+                ref_image=ref_channel,
+                mask=mask_iso,
+                labels=seg_iso,
+                sigma=sigma,
+            )
+            norm_image[:, ch_float, :, :] = channel_norm
+        norm_image[:, pos_ref, :, :] = ref_norm
 
-    else : #3D data, one channel
-        (mask_iso,iso_image,seg_iso)= change_arrays_pixelsize(mask=mask,image=image,labels=labels,reshape_factors=np.divide(scale,(1,1,1)))   
-        norm_image,_ = normalize_intensity(image=iso_image,ref_image=iso_image,mask=mask_iso,labels=seg_iso,sigma=sigma)
+    else:  # 3D data, one channel
+        (mask_iso, iso_image, seg_iso) = change_arrays_pixelsize(
+            mask=mask,
+            image=image,
+            labels=labels,
+            reshape_factors=np.divide(scale, (1, 1, 1)),
+        )
+        norm_image, _ = normalize_intensity(
+            image=iso_image,
+            ref_image=iso_image,
+            mask=mask_iso,
+            labels=seg_iso,
+            sigma=sigma,
+        )
 
-    return(mask_iso,norm_image,seg_iso)
+    return (mask_iso, norm_image, seg_iso)
+
 
 def change_arrays_pixelsize(
     mask: np.ndarray = None,
     image: np.ndarray = None,
     labels: np.ndarray = None,
-    input_pixelsize: Tuple[float, float, float] = (1, 1, 1),
-    output_pixelsize: Tuple[float, float, float] = (1, 1, 1),
+    input_pixelsize: tuple[float, float, float] = (1, 1, 1),
+    output_pixelsize: tuple[float, float, float] = (1, 1, 1),
     order: int = 1,
     n_jobs: int = -1,
 ) -> np.ndarray:
@@ -152,9 +191,16 @@ def change_arrays_pixelsize(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_arrays = [
-                _change_arrays_pixelsize(ma, im, labs, input_pixelsize, output_pixelsize, order=order)
+                _change_arrays_pixelsize(
+                    ma,
+                    im,
+                    labs,
+                    input_pixelsize,
+                    output_pixelsize,
+                    order=order,
+                )
                 for ma, im, labs in tqdm(
-                    zip(mask, image, labels),
+                    zip(mask, image, labels, strict=False),
                     desc="Making array isotropic",
                     total=n_frames,
                 )
@@ -175,7 +221,7 @@ def change_arrays_pixelsize(
 
             resized_arrays = process_map(
                 func_parallel,
-                zip(mask, image, labels),
+                zip(mask, image, labels, strict=False),
                 max_workers=max_workers,
                 desc="Making array isotropic",
                 total=n_frames,
@@ -184,14 +230,21 @@ def change_arrays_pixelsize(
     else:
         # Resizing the whole image
         resized_arrays = _change_arrays_pixelsize(
-            mask, image, labels, 
+            mask,
+            image,
+            labels,
             input_pixelsize=input_pixelsize,
             output_pixelsize=output_pixelsize,
-            order=order
+            order=order,
         )
 
-    if sum([mask_not_None, image_not_None, labels_not_None]) > 1 and is_temporal:
-        resized_arrays = tuple(map(np.array, zip(*resized_arrays)))
+    if (
+        sum([mask_not_None, image_not_None, labels_not_None]) > 1
+        and is_temporal
+    ):
+        resized_arrays = tuple(
+            map(np.array, zip(*resized_arrays, strict=False))
+        )
         return resized_arrays
     else:
         return resized_arrays
@@ -261,7 +314,12 @@ def compute_mask(
     else:
         # Single image processing
         mask = _compute_mask(
-            image, method, sigma_blur, threshold_factor, compute_convex_hull, registered_image
+            image,
+            method,
+            sigma_blur,
+            threshold_factor,
+            compute_convex_hull,
+            registered_image,
         )
 
     return mask
@@ -341,23 +399,22 @@ def normalize_intensity(
     labels: np.ndarray = None,
     width: int = 3,
     n_jobs: int = -1,
-) -> Tuple[np.ndarray, np.ndarray]:
-    
+) -> tuple[np.ndarray, np.ndarray]:
     """
-    Normalize the intensity of an image based on a reference image assumed to have 
+    Normalize the intensity of an image based on a reference image assumed to have
     ideally homogeneous signal (e.g DAPI).
 
     Parameters:
     - image: numpy array, input image to be normalized
     - ref_image: numpy array, reference image used for normalization
-    - sigma: float, standard deviation for Gaussian smoothing of the reference 
+    - sigma: float, standard deviation for Gaussian smoothing of the reference
         image (default: None)
     - mask: numpy array, binary mask of the sample (default: None)
     - labels: numpy array, labels indicating the instances in which the reference
         signal is expressed (default: None)
-    - width: int, number of neighboring planes to consider for reference plane 
+    - width: int, number of neighboring planes to consider for reference plane
         calculation (default: 3)
-    - n_jobs: int, number of parallel jobs to use (-1 for all available CPUs, 1 for 
+    - n_jobs: int, number of parallel jobs to use (-1 for all available CPUs, 1 for
         sequential execution) (default: -1)
 
     Returns:
@@ -386,7 +443,7 @@ def normalize_intensity(
                     width=width,
                 )
                 for im, ref_im, ma, lab in tqdm(
-                    zip(image, ref_image, mask, labels),
+                    zip(image, ref_image, mask, labels, strict=False),
                     desc="Normalizing intensity",
                     total=image.shape[0],
                 )
@@ -408,7 +465,7 @@ def normalize_intensity(
 
             normalized_arrays = process_map(
                 func_parallel,
-                zip(image, ref_image),
+                zip(image, ref_image, strict=False),
                 max_workers=max_workers,
                 desc="Normalizing intensity",
                 total=image.shape[0],
@@ -417,17 +474,21 @@ def normalize_intensity(
     else:
         # Single image normalization
         normalized_arrays = _normalize_intensity(
-            image, ref_image, sigma=sigma, mask=mask, labels=labels,
-            width=width
+            image,
+            ref_image,
+            sigma=sigma,
+            mask=mask,
+            labels=labels,
+            width=width,
         )
 
     if is_temporal:
-        normalized_arrays =  tuple(map(np.array, zip(*normalized_arrays)))
+        normalized_arrays = tuple(
+            map(np.array, zip(*normalized_arrays, strict=False))
+        )
         return normalized_arrays
     else:
         return normalized_arrays
-    
-
 
 
 def align_array_major_axis(
@@ -441,8 +502,8 @@ def align_array_major_axis(
     n_jobs: int = -1,
 ) -> Union[
     np.ndarray,
-    Tuple[np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray],
+    tuple[np.ndarray, np.ndarray],
+    tuple[np.ndarray, np.ndarray, np.ndarray],
 ]:
     """
     Aligns the major axis of an array to a target axis in a specified rotation plane.
@@ -556,8 +617,8 @@ def crop_array_using_mask(
     n_jobs: int = -1,
 ) -> Union[
     np.ndarray,
-    Tuple[np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray],
+    tuple[np.ndarray, np.ndarray],
+    tuple[np.ndarray, np.ndarray, np.ndarray],
 ]:
     """
     Crop an array using a binary mask. If the array is temporal, the cropping
@@ -610,12 +671,12 @@ def crop_array_using_mask(
     elif labels is not None:
         return mask_cropped, labels_cropped
     else:
-        return mask_cropped 
-    
+        return mask_cropped
+
 
 def masked_gaussian_smooth(
     image: np.ndarray,
-    sigmas: Union[float, List[float]],
+    sigmas: Union[float, list[float]],
     mask: Optional[np.ndarray] = None,
     mask_for_volume: Optional[np.ndarray] = None,
     n_jobs: int = -1,
@@ -649,13 +710,15 @@ def masked_gaussian_smooth(
         if n_jobs == 1:
 
             iterable = tqdm(
-                zip(image, mask, mask_for_volume), total=len(image), desc="Smoothing image"
+                zip(image, mask, mask_for_volume, strict=False),
+                total=len(image),
+                desc="Smoothing image",
             )
 
             return np.array([func(elem) for elem in iterable])
 
         else:
-            elems = [elem for elem in zip(image, mask)]
+            elems = [elem for elem in zip(image, mask, strict=False)]
 
             max_workers = (
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
@@ -668,156 +731,169 @@ def masked_gaussian_smooth(
 
     else:
         return _masked_smooth_gaussian(image, sigmas, mask, mask_for_volume)
-    
-
-
-
-
 
 
 def masked_gaussian_smooth_dense_two_arrays_gpu(
-    datas: List[np.ndarray],
-    sigmas: Union[float, List[float]],
+    datas: list[np.ndarray],
+    sigmas: Union[float, list[float]],
     mask: np.ndarray = None,
-    masks_for_volume: Union[np.ndarray, List[np.ndarray]] = None,
+    masks_for_volume: Union[np.ndarray, list[np.ndarray]] = None,
 ):
     """
     Inputs in data are assumed to be non-temporal, 3D arrays.
     """
 
     from pyclesperanto_prototype import gaussian_blur
-    
 
-    if isinstance(sigmas, (int, float)):
+    if isinstance(sigmas, int | float):
         sigmas = [sigmas] * 3
 
     if mask is None:
-        smoothed1 = np.array(gaussian_blur(
-            datas[0].astype(np.float16), 
-            sigma_x=sigmas[0], 
-            sigma_y=sigmas[1], 
-            sigma_z=sigmas[2]
-        ))
-        smoothed2 = np.array(gaussian_blur(
-            datas[1].astype(np.float16), 
-            sigma_x=sigmas[0], 
-            sigma_y=sigmas[1], 
-            sigma_z=sigmas[2]
-        ))
+        smoothed1 = np.array(
+            gaussian_blur(
+                datas[0].astype(np.float16),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            )
+        )
+        smoothed2 = np.array(
+            gaussian_blur(
+                datas[1].astype(np.float16),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            )
+        )
 
     elif masks_for_volume is None:
 
-        smoothed1 = np.array(gaussian_blur(
-            np.where(mask, datas[0].astype(np.float16), 0.0),
-            sigma_x=sigmas[0],
-            sigma_y=sigmas[1],
-            sigma_z=sigmas[2],
-        ))
+        smoothed1 = np.array(
+            gaussian_blur(
+                np.where(mask, datas[0].astype(np.float16), 0.0),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            )
+        )
 
-        smoothed2 = np.array(gaussian_blur(
-            np.where(mask, datas[1].astype(np.float16), 0.0),
-            sigma_x=sigmas[0],
-            sigma_y=sigmas[1],
-            sigma_z=sigmas[2],
-        ))
+        smoothed2 = np.array(
+            gaussian_blur(
+                np.where(mask, datas[1].astype(np.float16), 0.0),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            )
+        )
 
-        effective_volume = np.array(gaussian_blur(
-            mask.astype(np.float16),
-            sigma_x=sigmas[0],
-            sigma_y=sigmas[1],
-            sigma_z=sigmas[2],
-        ))
+        effective_volume = np.array(
+            gaussian_blur(
+                mask.astype(np.float16),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            )
+        )
 
         smoothed1 = np.where(
-            mask,
-            np.divide(smoothed1, effective_volume, where=mask),
-            0.0
+            mask, np.divide(smoothed1, effective_volume, where=mask), 0.0
         )
 
         smoothed2 = np.where(
-            mask,
-            np.divide(smoothed2, effective_volume, where=mask),
-            0.0
+            mask, np.divide(smoothed2, effective_volume, where=mask), 0.0
         )
 
-    else: # both masks and masks_for_volume are not None
+    else:  # both masks and masks_for_volume are not None
 
         if isinstance(masks_for_volume, np.ndarray):
-            
-            smoothed1 = np.array(gaussian_blur(
-                np.where(masks_for_volume, datas[0].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
 
-            smoothed2 = np.array(gaussian_blur(
-                np.where(masks_for_volume, datas[1].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
+            smoothed1 = np.array(
+                gaussian_blur(
+                    np.where(
+                        masks_for_volume, datas[0].astype(np.float16), 0.0
+                    ),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
 
-            effective_volume = np.array(gaussian_blur(
-                masks_for_volume.astype(np.float16),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
+            smoothed2 = np.array(
+                gaussian_blur(
+                    np.where(
+                        masks_for_volume, datas[1].astype(np.float16), 0.0
+                    ),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
+
+            effective_volume = np.array(
+                gaussian_blur(
+                    masks_for_volume.astype(np.float16),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
 
             smoothed1 = np.where(
-                mask,
-                np.divide(smoothed1, effective_volume, where=mask),
-                0.0
+                mask, np.divide(smoothed1, effective_volume, where=mask), 0.0
             )
 
             smoothed2 = np.where(
-                mask,
-                np.divide(smoothed2, effective_volume, where=mask),
-                0.0
+                mask, np.divide(smoothed2, effective_volume, where=mask), 0.0
             )
-
 
         elif isinstance(masks_for_volume, list):
 
-            smoothed1 = np.array(gaussian_blur(
-                np.where(masks_for_volume[0], datas[0].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-        
-            smoothed2 = np.array(gaussian_blur(
-                np.where(masks_for_volume[1], datas[1].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
+            smoothed1 = np.array(
+                gaussian_blur(
+                    np.where(
+                        masks_for_volume[0], datas[0].astype(np.float16), 0.0
+                    ),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
 
-            effective_volume1 = np.array(gaussian_blur(
-                masks_for_volume[0].astype(np.float16),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
+            smoothed2 = np.array(
+                gaussian_blur(
+                    np.where(
+                        masks_for_volume[1], datas[1].astype(np.float16), 0.0
+                    ),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
 
-            effective_volume2 = np.array(gaussian_blur(
-                masks_for_volume[1].astype(np.float16),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
+            effective_volume1 = np.array(
+                gaussian_blur(
+                    masks_for_volume[0].astype(np.float16),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
+
+            effective_volume2 = np.array(
+                gaussian_blur(
+                    masks_for_volume[1].astype(np.float16),
+                    sigma_x=sigmas[0],
+                    sigma_y=sigmas[1],
+                    sigma_z=sigmas[2],
+                )
+            )
 
             smoothed1 = np.where(
-                mask,
-                np.divide(smoothed1, effective_volume1, where=mask),
-                0.0
+                mask, np.divide(smoothed1, effective_volume1, where=mask), 0.0
             )
 
             smoothed2 = np.where(
-                mask,
-                np.divide(smoothed2, effective_volume2, where=mask),
-                0.0
+                mask, np.divide(smoothed2, effective_volume2, where=mask), 0.0
             )
 
     return smoothed1, smoothed2

@@ -1,17 +1,19 @@
 import numpy as np
-
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage.morphology import binary_fill_holes
 from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.morphology import convex_hull_image
-from skimage.transform import resize, rescale
+from skimage.transform import rescale, resize
+
 from tapenade.preprocessing._smoothing import _smooth_gaussian
 
 
 def _snp_threshold_binarization(
-    image: np.ndarray, sigma_blur: float, threshold_factor: float, 
-    registered_image: bool = False
+    image: np.ndarray,
+    sigma_blur: float,
+    threshold_factor: float,
+    registered_image: bool = False,
 ) -> np.ndarray:
     """
     Threshold image based on signal-and-noise product.
@@ -28,12 +30,11 @@ def _snp_threshold_binarization(
     - binary_mask: numpy array, binary mask computed using SNP thresholding
     """
 
-
     if registered_image:
         nonzero_mask = image > 0
 
         blurred = _smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
-        
+
         blurred2 = _smooth_gaussian(
             image**2, mask=nonzero_mask, sigmas=sigma_blur
         )
@@ -91,8 +92,6 @@ def _otsu_threshold_binarization(
     return binary_mask
 
 
-
-
 ### POST-PROCESSING FUNCTIONS
 def _get_largest_connected_component(array: np.ndarray) -> np.ndarray:
     """
@@ -130,7 +129,7 @@ def _compute_mask_convex_hull(
         # Rescale the mask if precision_factor is not 1
         hull_mask = rescale(
             hull_mask,
-            1/precision_factor,
+            1 / precision_factor,
             anti_aliasing=False,
             order=0,
             preserve_range=True,
@@ -216,7 +215,7 @@ def _compute_mask(
     sigma_blur: float,
     threshold_factor: float = 1,
     compute_convex_hull: bool = False,
-    registered_image: bool = False
+    registered_image: bool = False,
 ) -> np.ndarray:
     """
     Process the mask for the given image.

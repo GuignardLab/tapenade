@@ -5,10 +5,11 @@ from tqdm import tqdm
 
 try:
     from csbdeep.utils import normalize
-    from stardist import random_label_cmap
     from stardist.models import StarDist3D
 except ImportError:
-    warnings.warn("Please install the required packages: pip install stardist csbdeep")
+    warnings.warn(
+        "Please install the required packages: pip install stardist csbdeep"
+    )
 
 import os
 from pathlib import Path
@@ -20,7 +21,7 @@ def predict_stardist(
     array: np.ndarray,
     model_path: str,
     input_voxelsize: tuple,
-    voxelsize_model:tuple=(0.7,0.7,0.7),
+    voxelsize_model: tuple = (0.7, 0.7, 0.7),
     normalize_input: bool = True,
 ):
     """
@@ -42,10 +43,10 @@ def predict_stardist(
     model = StarDist3D(None, name=model_name, basedir=directory)
 
     data = change_arrays_pixelsize(
-        image=array, 
-        input_pixelsize=input_voxelsize, 
+        image=array,
+        input_pixelsize=input_voxelsize,
         output_pixelsize=voxelsize_model,
-        order=1
+        order=1,
     )
     if normalize_input:
         data = normalize(data, 1, 99)
@@ -62,7 +63,7 @@ def predict_stardist(
     return np.asarray(aniso_labels).astype(np.int16)
 
 
-def find_seg_errors(segmentation:np.ndarray,image:np.ndarray):
+def find_seg_errors(segmentation: np.ndarray, image: np.ndarray):
     """
     Compute statisitics of intensity of each label to try to find out exceptions/anomalies and detect segmentation errors.
 
@@ -76,28 +77,33 @@ def find_seg_errors(segmentation:np.ndarray,image:np.ndarray):
     Col 2 is its mean intensity (in the ROI)
     Col 3 is the std of its intensity distrib
     Col 4 is the ratio of standard deviation and mean. We use this value to detect wrong segmentations
-    
+
     """
     list_labels = list(np.unique(segmentation))
     list_labels.remove(0)
-    print(len(list_labels),' labels to process')
+    print(len(list_labels), " labels to process")
 
-    intensity_distribution=np.zeros((len(list_labels),4)) 
-    for id,label in tqdm(enumerate(list_labels)) :
-        intensity_distribution[id,0]=label
-        mask=(segmentation==label)
-        list_pix=image[mask]
+    intensity_distribution = np.zeros((len(list_labels), 4))
+    for index, label in tqdm(enumerate(list_labels)):
+        intensity_distribution[index, 0] = label
+        mask = segmentation == label
+        list_pix = image[mask]
         n, bins = np.histogram(list_pix)
-        mids = 0.5*(bins[1:] + bins[:-1])
+        mids = 0.5 * (bins[1:] + bins[:-1])
         mean = np.average(mids, weights=n)
-        var = np.average((mids - mean)**2, weights=n)
-        intensity_distribution[id,1]=mean
-        intensity_distribution[id,2]=var
-        intensity_distribution[id,3]=var/mean
+        var = np.average((mids - mean) ** 2, weights=n)
+        intensity_distribution[index, 1] = mean
+        intensity_distribution[index, 2] = var
+        intensity_distribution[index, 3] = var / mean
 
-    return (intensity_distribution)
+    return intensity_distribution
 
-def tresh_distribution(intensity_distribution:np.ndarray,threshold:float,column_number:int=3) :
+
+def tresh_distribution(
+    intensity_distribution: np.ndarray,
+    threshold: float,
+    column_number: int = 3,
+):
     """
     Thresholds the Distribution to find labels that could be wrong segmentation.
 
@@ -108,16 +114,16 @@ def tresh_distribution(intensity_distribution:np.ndarray,threshold:float,column_
                     If you want to discrimnate on the mean intensity of the ROI, choose 1.
                     If you want to discriminate on the std, choose 2.
                     If you want to discriminate over the std divided by the mean intensity for each label, choose 3.
-    
+
     Returns:
     A list of labels that might be false segmentations.
-    
+
     """
 
-
-    id_merged_cells=[]
-    for id,intensity in enumerate(intensity_distribution[:,column_number]) :
-        if intensity>threshold :
-            id_merged_cells.append(int(intensity_distribution[id,0]))
-    return(id_merged_cells)
-
+    id_merged_cells = []
+    for index, intensity in enumerate(
+        intensity_distribution[:, column_number]
+    ):
+        if intensity > threshold:
+            id_merged_cells.append(int(intensity_distribution[index, 0]))
+    return id_merged_cells

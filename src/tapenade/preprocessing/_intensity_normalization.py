@@ -1,24 +1,26 @@
 import numpy as np
-from tapenade.preprocessing._smoothing import _smooth_gaussian
 from scipy.optimize import minimize_scalar
 
+from tapenade.preprocessing._smoothing import _smooth_gaussian
 
-def _median_absolute_deviation(array):
+
+def _median_absolute_deviation(array: np.ndarray) -> float:
     return np.nanmedian(np.abs(array - np.nanmedian(array)))
 
 
-def _nans_outside_mask(array, mask):
+def _nans_outside_mask(array: np.ndarray, mask: np.ndarray):
     return np.where(mask, array, np.nan)
 
 
-def _optimize_sigma(ref_array, mask, labels_mask):
+def _optimize_sigma(
+    ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray
+):
 
-    def opt_func(sigma, ref_array, mask, labels_mask):
+    def opt_func(
+        sigma, ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray
+    ):
         ref_array_smooth = _smooth_gaussian(
-            ref_array, 
-            sigmas=sigma,
-            mask_for_volume=labels_mask, 
-            mask=mask
+            ref_array, sigmas=sigma, mask_for_volume=labels_mask, mask=mask
         )
 
         if labels_mask is not None:
@@ -30,21 +32,34 @@ def _optimize_sigma(ref_array, mask, labels_mask):
         else:
             res = ref_array / ref_array_smooth
 
-        return _median_absolute_deviation(np.nanmedian(res, axis=(1,2)))
-    
-    res = minimize_scalar(opt_func, args=(ref_array, mask, labels_mask), bounds=(10, 30), 
-                          method='bounded', options={'maxiter': 5, 'disp':3})
+        return _median_absolute_deviation(np.nanmedian(res, axis=(1, 2)))
+
+    res = minimize_scalar(
+        opt_func,
+        args=(ref_array, mask, labels_mask),
+        bounds=(10, 30),
+        method="bounded",
+        options={"maxiter": 5, "disp": 3},
+    )
 
     return res.x
 
-def _find_reference_plane_from_medians(array):
-    ref_ind = np.nanargmax(np.nanmedian(array, axis=(1,2)))
-    return ref_ind
-   
 
-def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, width=3):
+def _find_reference_plane_from_medians(array: np.ndarray):
+    ref_ind = np.nanargmax(np.nanmedian(array, axis=(1, 2)))
+    return ref_ind
+
+
+def _normalize_intensity(
+    array: np.ndarray,
+    ref_array: np.ndarray,
+    sigma=None,
+    mask: np.ndarray = None,
+    labels: np.ndarray = None,
+    width=3,
+):
     """
-    Normalize the intensity of an array based on a reference array assumed to have 
+    Normalize the intensity of an array based on a reference array assumed to have
     ideally homogeneous signal (e.g DAPI).
 
     Parameters:
@@ -61,25 +76,19 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
     - array_norm (ndarray): The normalized input array.
     - ref_array_norm (ndarray): The normalized reference array.
     """
-    
+
     num_z_slices = array.shape[0]
-    
-    if labels is None:
-        labels_mask = None
-    else:
-        labels_mask = labels.astype(bool)
-    
+
+    labels_mask = None if labels is None else labels.astype(bool)
+
     # compute smoothed reference array for normalization
     if sigma is None:
         sigma = _optimize_sigma(ref_array, mask, labels_mask)
-        print('sigma = ',sigma)
+        print("sigma = ", sigma)
     ref_array_smooth = _smooth_gaussian(
-        ref_array, 
-        sigmas=sigma,
-        mask_for_volume=labels_mask, 
-        mask=mask
+        ref_array, sigmas=sigma, mask_for_volume=labels_mask, mask=mask
     )
-    
+
     if mask is not None:
         array = _nans_outside_mask(array, mask)
         ref_array = _nans_outside_mask(ref_array, mask)
@@ -102,13 +111,19 @@ def _normalize_intensity(array, ref_array, sigma=None, mask=None, labels=None, w
     z_ref = _find_reference_plane_from_medians(ref_array)
     z_ref_norm = _find_reference_plane_from_medians(ref_array_norm)
 
-    sl = slice(max(0, z_ref-width), min(num_z_slices, z_ref+width))
-    sl_norm = slice(max(0, z_ref_norm-width), min(num_z_slices, z_ref_norm+width))
+    sl = slice(max(0, z_ref - width), min(num_z_slices, z_ref + width))
+    sl_norm = slice(
+        max(0, z_ref_norm - width), min(num_z_slices, z_ref_norm + width)
+    )
 
-    ref_array_normalization_factor = np.nanmedian(ref_array_norm[sl_norm]) / np.nanmedian(ref_array[sl])
-    array_normalization_factor = np.nanmedian(array_norm[sl_norm]) / np.nanmedian(array[sl])
+    ref_array_normalization_factor = np.nanmedian(
+        ref_array_norm[sl_norm]
+    ) / np.nanmedian(ref_array[sl])
+    array_normalization_factor = np.nanmedian(
+        array_norm[sl_norm]
+    ) / np.nanmedian(array[sl])
 
     ref_array_norm = ref_array_norm / ref_array_normalization_factor
     array_norm = array_norm / array_normalization_factor
-    
-    return(array_norm, ref_array_norm)
+
+    return (array_norm, ref_array_norm)

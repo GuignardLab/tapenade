@@ -4,17 +4,18 @@ import math
 import os
 from pathlib import Path
 from xml.dom import minidom
-import tifffile
+
 import matplotlib.pyplot as plt
 import napari
 import numpy as np
 import registrationtools
-import io
+import tifffile
+import transforms3d._gohlketransforms as tg
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.transform import Rotation
-from skimage.measure import regionprops
 from skimage import io
-import transforms3d._gohlketransforms as tg
+from skimage.measure import regionprops
+
 
 def extract_positions(path_positions: str):
     """
@@ -25,7 +26,9 @@ def extract_positions(path_positions: str):
         path to the xml file
     """
     print(path_positions)
-    positions = minidom.parse(str(path_positions)) #need to convert the path to a string, otherwise minidom does not work for Windows paths
+    positions = minidom.parse(
+        str(path_positions)
+    )  # need to convert the path to a string, otherwise minidom does not work for Windows paths
     pos_x = positions.getElementsByTagName("dXPosition")
     pos_y = positions.getElementsByTagName("dYPosition")
 
@@ -37,6 +40,7 @@ def extract_positions(path_positions: str):
         ypos[i] = pos_y[i].attributes["value"].value
 
     return (xpos, ypos)
+
 
 def plot_positions(path_ref_positions: str, path_float_positions: str):
     """
@@ -69,6 +73,7 @@ def plot_positions(path_ref_positions: str, path_float_positions: str):
 
     plt.legend()
 
+
 def associate_positions(path_ref_positions: str, path_float_positions: str):
     """
     Associate the objects from the reference view with the objects from the floating view, by solving a linear sum assignement between the two distribution
@@ -84,10 +89,10 @@ def associate_positions(path_ref_positions: str, path_float_positions: str):
     2 lists of indices, ref then float, sorted according to the asssgnement
 
     """
-    
+
     (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
     (xpos_float, ypos_float) = extract_positions(path_float_positions)
-    ypos_float=-ypos_float
+    ypos_float = -ypos_float
     cost = np.zeros((len(xpos_ref), len(xpos_float)))
     for i in range(len(xpos_ref)):
         for j in range(len(xpos_float)):
@@ -98,7 +103,8 @@ def associate_positions(path_ref_positions: str, path_float_positions: str):
     row_ind, col_ind = linear_sum_assignment(cost)
     list_row = [int(i) for i in list(row_ind + 1)]
     list_col = [int(i) for i in list(col_ind + 1)]
-    return (list_row,list_col)
+    return (list_row, list_col)
+
 
 def create_folders(
     folder_experiment: str,
@@ -141,26 +147,25 @@ def create_folders(
         os.mkdir(os.path.join(folder_sample, "registered"))
         os.mkdir(os.path.join(folder_sample, "fused"))
 
-        image_ref = io.imread(
-            Path(folder_experiment) / f"{filename_ref}.tif"
-        )
+        image_ref = io.imread(Path(folder_experiment) / f"{filename_ref}.tif")
         image_float = io.imread(
             Path(folder_experiment) / f"{filename_float}.tif"
         )
-        
+
         for ind_ch, ch in enumerate(channels):
-            imref = (image_ref[:, :, :,ind_ch])
-            imfloat = (image_float[:,:,:,ind_ch])
+            imref = image_ref[:, :, :, ind_ch]
+            imfloat = image_float[:, :, :, ind_ch]
             io.imsave(
                 Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
-                imref, ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
+                imref,  ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
             )  # ,imagej=True, metadata={'axes': 'TZYX'})
             io.imsave(
                 Path(folder_sample) / "raw" / f"{filename_float}_{ch}.tif",
                 imfloat,
             )  # ,imagej=True, metadata={'axes': 'TZYX'})>
 
-def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
+
+def transformation_from_plugin(path_json: str, scale: tuple = (1, 1, 1)):
     """
     Extract the transformation from the json file saved by the plugin
     Parameters
@@ -178,12 +183,20 @@ def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
     trans_z = data["trans_z"]
     trans_y = data["trans_y"]
     trans_x = data["trans_x"]
-    #in the napari plugin, the translation computed is the one after the rotation, so we need to set the translation trans1 before rotation to 0
-    init_trsfs = list_init_trsf(trans1=[0, 0, 0], trans2=[trans_z, trans_y, trans_x], rot=[rot_x, rot_y, rot_z], scale=scale)
-    return (init_trsfs)
+    # in the napari plugin, the translation computed is the one after the rotation, so we need to set the translation trans1 before rotation to 0
+    init_trsfs = list_init_trsf(
+        trans1=[0, 0, 0],
+        trans2=[trans_z, trans_y, trans_x],
+        rot=[rot_x, rot_y, rot_z],
+        scale=scale,
+    )
+    return init_trsfs
+
 
 def manual_registration_fct(
-    reference_landmarks, floating_landmarks, scale: tuple = (1, 1, 1)
+    reference_landmarks: np.ndarray,
+    floating_landmarks: np.ndarray,
+    scale: tuple = (1, 1, 1),
 ):
     # stolen from https://github.com/nghiaho12/rigid_transform_3D/blob/master/rigid_transform_3D.py
     """
@@ -264,78 +277,89 @@ def manual_registration_fct(
     center_image = (np.array(reference_landmarks.shape) / 2) * scale
     translation1 = center_image - centermass_float
     translation2 = centermass_ref - center_image
-    return (list(rotation_angles), list(translation1), list(translation2)) #into list to be able to copy paste directly into the registration function
+    return (
+        list(rotation_angles),
+        list(translation1),
+        list(translation2),
+    )  # into list to be able to copy paste directly into the registration function
 
-def list_init_trsf(trans1,trans2,rot):
+
+def list_init_trsf(trans1: list, trans2: list, rot: list):
     """
     Transforms the individual values of rotation and translation into a list of transformations to apply in the right order. This list can be given as the parameter other_trsf to the function register
     Parameters
     ----------
     trans1 : list
         list of the translations to apply to the floating image BEFORE ROTATION
-    trans2 : list   
+    trans2 : list
         list of the translations to apply to the floating image AFTER ROTATION
-    rot : list  
+    rot : list
         list of the rotations to apply to the floating image
     """
 
-    trans2_in_um=trans2
-    trans1_in_um=trans1
+    trans2_in_um = trans2
+    trans1_in_um = trans1
     init_trsf = [
-            [
-                "trans",
-                "X",
-                -trans1_in_um[2],
-                "trans",
-                "Y",
-                -trans1_in_um[1],
-                "trans",
-                "Z",
-                -trans1_in_um[0],
-                "rot",
-                "X",
-                -rot[0],
-                "rot",
-                "Y",
-                -rot[1],
-                "rot",
-                "Z",
-                -rot[2],
-                "trans",
-                "X",
-                -trans2_in_um[2],
-                "trans",
-                "Y",
-                -trans2_in_um[1],
-                "trans",
-                "Z",
-                -trans2_in_um[0],
-            ]
+        [
+            "trans",
+            "X",
+            -trans1_in_um[2],
+            "trans",
+            "Y",
+            -trans1_in_um[1],
+            "trans",
+            "Z",
+            -trans1_in_um[0],
+            "rot",
+            "X",
+            -rot[0],
+            "rot",
+            "Y",
+            -rot[1],
+            "rot",
+            "Z",
+            -rot[2],
+            "trans",
+            "X",
+            -trans2_in_um[2],
+            "trans",
+            "Y",
+            -trans2_in_um[1],
+            "trans",
+            "Z",
+            -trans2_in_um[0],
         ]
-    return(init_trsf)
+    ]
+    return init_trsf
 
-def compute_transformation_from_trsf_files(path_trsf:str):
-        
-    f = open(Path(path_trsf) / "A1-rigid.trsf", 'r')
 
-    # Read and ignore header lines (NECESSARY)
-    header1 = f.readline()
-    header2 = f.readline()
+def compute_transformation_from_trsf_files(path_trsf: str):
 
-    matrix=np.zeros((4,4))
+    with open(Path(path_trsf) / "A1-rigid.trsf") as f:
 
-    index=0;
-    for line in f:
-        line = line.strip()
-        columns = line.split()
-        if index<4:
-            matrix[index,:] = np.array(columns, dtype=float)
-        index=index+1
-        
-    scale, shear, angles, trans, persp = tg.decompose_matrix(matrix)
-    angles_deg=[math.degrees(angles[0]), math.degrees(angles[1]), math.degrees(angles[2])]
-    print("rotation angles (X,Y,Z) in deg:",angles_deg)
-    print("translation vector:",trans)
+        # Read and ignore header lines (NECESSARY)
+        _ = f.readline()
+        _ = f.readline()
+
+        matrix = np.zeros((4, 4))
+
+        index = 0
+        for line in f:
+            line = line.strip()
+            columns = line.split()
+            if index < 4:
+                matrix[index, :] = np.array(columns, dtype=float)
+            index = index + 1
+
+        scale, shear, angles, trans, persp = tg.decompose_matrix(matrix)
+        angles_deg = [
+            math.degrees(angles[0]),
+            math.degrees(angles[1]),
+            math.degrees(angles[2]),
+        ]
+        print("rotation angles (X,Y,Z) in deg:", angles_deg)
+        print("translation vector:", trans)
+
 
 def register(
     path_data: str,
@@ -343,8 +367,8 @@ def register(
     path_registered_data: str,
     reference_image: str,
     floating_image: str,
-    input_voxel: list = [1, 1, 1],
-    output_voxel: list = [1, 1, 1],
+    input_voxel: tuple = (1, 1, 1),
+    output_voxel: tuple = (1, 1, 1),
     compute_trsf: int = 1,
     trans1: list = None,
     rot: list = None,
@@ -360,10 +384,9 @@ def register(
     save_json: str = "",
     ordered_init_trsfs: bool = True,
 ):
-
     """
     Register the two sides of the sample, using the previously computed transformation (if any) or computing a new one
-    
+
     Parameters
     ----------
     path_data : str
@@ -399,7 +422,7 @@ def register(
     input_init_trsf_from_plugin : str, optional
         path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file no matter the parameters rot, trans1, trans2 or other_trsf
     test_init : int, optional
-        1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0. 
+        1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0.
     trsf_type : str, optional
         type of transformation to compute : rigid, affine. By default rigid.
     depth : int, optional
@@ -425,14 +448,16 @@ def register(
         trans2 = [0, 0, 0]
 
     if input_init_trsf_from_plugin != "":
-    #if the user input the json file from the plugin, the json file is used as init trsf no matter the parameters rot, trans1, trans 2 or other_trsf
-        init_trsfs=transformation_from_plugin(input_init_trsf_from_plugin,scale=input_voxel)
+        # if the user input the json file from the plugin, the json file is used as init trsf no matter the parameters rot, trans1, trans 2 or other_trsf
+        init_trsfs = transformation_from_plugin(
+            input_init_trsf_from_plugin, scale=input_voxel
+        )
     elif input_init_trsf_from_plugin == "" and other_trsf is not None:
-        print('other_trsf',other_trsf)
-    # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
+        print("other_trsf", other_trsf)
+        # if the user defined the initial transformation with the parameter 'other_trsf' (list of transformations he wants), then we use this transformation as init_trsfs
         init_trsfs = other_trsf
     else:  # is the user did not precise other_trsf or any json file, then we use the parameters rot, trans1 and trans2 to "build" init_trsfs.
-        init_trsfs = list_init_trsf(trans1=trans1,trans2=trans2,rot=rot)
+        init_trsfs = list_init_trsf(trans1=trans1, trans2=trans2, rot=rot)
     data = {
         "path_to_data": str(path_data),
         "ref_im": reference_image,
@@ -464,10 +489,11 @@ def register(
     tr = registrationtools.SpatialRegistration(data)
     tr.run_trsf()
 
+
 def check_napari(
     folder: str,
-    reference_image,
-    floating_image,
+    reference_image: np.ndarray,
+    floating_image: np.ndarray,
     additional_images: list = None,
     names_additional_images: list = None,
     scale: tuple = (1, 1, 1),
@@ -498,18 +524,14 @@ def check_napari(
         if os.path.exists(
             Path(folder) / "registered" / reference_image
         ):  # if the bounding box or voxel size has changed, then the reference image has been saved as an output.
-            ref_im = io.imread(
-                Path(folder) / "registered" / reference_image
-            )
+            ref_im = io.imread(Path(folder) / "registered" / reference_image)
         else:  # if the bbox did not change, the reference image has not changed and is found in the raw folder only.
             ref_im = io.imread(Path(folder) / "raw" / reference_image)
     else:
         ref_im = reference_image
 
     if isinstance(floating_image, (str | Path)):
-        float_im = io.imread(
-            Path(folder) / "registered" / floating_image
-        )
+        float_im = io.imread(Path(folder) / "registered" / floating_image)
     else:
         float_im = floating_image
 
@@ -543,6 +565,7 @@ def check_napari(
 
     napari.run()
 
+
 def sigmoid(z, z0, p):
     """
     Sigmoid function, to weight the images by the distance to the edges
@@ -550,6 +573,7 @@ def sigmoid(z, z0, p):
     p gives the slope. 5 corresponds to a low slope, wide fusion width and 25 to a strong slope, very thin fusion width.
     """
     return 1 / (1 + np.exp(-p * (z - z0)))
+
 
 def fuse_sides(
     path_registered_data: str,
@@ -559,7 +583,7 @@ def fuse_sides(
     name_output: str = "fusion",
     slope_coeff: int = 20,
     axis: int = 0,
-    return_image=False
+    return_image=False,
 ):
     """
     Fuse the two sides of the sample, using the previously registered images
@@ -585,17 +609,17 @@ def fuse_sides(
     """
 
     ###Takes the previously saved images (two registered sides)
-    if isinstance(reference_image_reg, (str | Path)): #if the reference image is a string, then we load the image from the path
-        ref_image = io.imread(
-            Path(path_registered_data) / reference_image_reg
-        )
-    #else its the image itself
+    if isinstance(
+        reference_image_reg, (str | Path)
+    ):  # if the reference image is a string, then we load the image from the path
+        ref_image = io.imread(Path(path_registered_data) / reference_image_reg)
+    # else its the image itself
     if isinstance(floating_image_reg, (str | Path)):
         float_image = io.imread(
             Path(path_registered_data) / floating_image_reg
         )
 
-    dtype_input=float_image.dtype
+    dtype_input = float_image.dtype
     mask_r = ref_image > 0
     mask_f = float_image > 0
     mask_fused = mask_r & mask_f
@@ -607,14 +631,20 @@ def fuse_sides(
     w2 = sigmoid(cumsum_normalized, x0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
-    fusion = (ref_image * w1 + float_image * w2)
+    fusion = ref_image * w1 + float_image * w2
 
     if return_image:
         return fusion
     io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
 
+
 def write_hyperstacks(
-    path: str, sample_id: str, channels: list, return_image=False,dtype=np.float32):
+    path: str,
+    sample_id: str,
+    channels: list,
+    return_image=False,
+    dtype=np.float32,
+):
     """
     Writes the hyperstacks, by stacking the channels of the registered images
 
@@ -631,19 +661,24 @@ def write_hyperstacks(
     """
 
     image = io.imread(
-        Path(path) / f"{sample_id}_{channels[0]}.tif")  # reading one image just to extract the shape of the image and initialize the hyperstack
+        Path(path) / f"{sample_id}_{channels[0]}.tif"
+    )  # reading one image just to extract the shape of the image and initialize the hyperstack
     (z, y, x) = image.shape
-    new_image = np.zeros((z, y, x,len(channels)))
+    new_image = np.zeros((z, y, x, len(channels)))
     for ch in range(len(channels)):
-        one_channel = io.imread(
-            Path(path) / f"{sample_id}_{channels[ch]}.tif")
+        one_channel = io.imread(Path(path) / f"{sample_id}_{channels[ch]}.tif")
         print(one_channel.shape)
-        new_image[:, :, :,ch] = one_channel
+        new_image[:, :, :, ch] = one_channel
 
     if return_image:
         return new_image
 
-    tifffile.imwrite(Path(path) / f"{sample_id}_registered.tif", new_image.astype(dtype), imagej=True, compression=('zlib', 1))#float16 not compatible with Fiji
+    tifffile.imwrite(
+        Path(path) / f"{sample_id}_registered.tif",
+        new_image.astype(dtype),
+        imagej=True,
+        compression=("zlib", 1),
+    )  # float16 not compatible with Fiji
 
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
@@ -669,6 +704,7 @@ def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
         int(x) - radius : int(x) + radius,
     ] = centermass_label
     return landmarks
+
 
 def remove_previous_files(path):
     filelist = glob.glob(os.path.join(path, "*.tif"))
