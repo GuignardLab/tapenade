@@ -6,7 +6,7 @@
 [![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
 [![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
-<img src="https://your-image-url.type" width="100">
+<img src="https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/tapenade3.png" width="100">
 
 A pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
