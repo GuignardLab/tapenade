@@ -10,7 +10,7 @@
 
 A pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
-If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade).
+If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade/blob/main/README.md#how-to-cite).
 
 This repository has been developed by (in alphabetical order):
 
@@ -118,6 +118,13 @@ From a given set of raw images, segmented object instances, and object mask, the
 This plugins allows the user to analyse the spatial correlations of two 3D fields loaded in Napari (e.g two fluorescent markers). The user can dynamically vary the analysis length scale, which corresponds to the standard deviation of the Gaussian kernel used for smoothing the 3D fields. 
 If a layer of segmented nuclei instances is additionally specified, the histogram is constructed by binning values at the nuclei level (each point corresponds to an individual nucleus). Otherwise, individual voxel values are used.
 The user can dynamically interact with the correlation heatmap by manually selecting a region in the plot. The corresponding cells (or voxels) that contributed to the region's statistics will be displayed in 3D on an independant Napari layer for the user to interact with and gain biological insight.
+
+## How to cite
+
+If you use this plugin for your research, please cite us using the following reference:
+
+
+
 
 
 ## Contributing
