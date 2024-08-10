@@ -6,7 +6,9 @@
 [![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
 [![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
-A repository to process 3D organoid images acquired with deep imaging microscopy.
+![Screenshot](https://https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/tapenade3.png)
+
+A pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
 If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade).
 
@@ -18,6 +20,10 @@ This repository has been developed by (in alphabetical order):
 - [Valentin Dunsing-Eichenauer](valentin.dunsing@univ-amu.fr)
 
 ----------------------------------
+
+## Overview
+
+
 
 ## Installation
 
@@ -32,6 +38,11 @@ To install latest development version :
 ```shell
 pip install git+https://github.com/GuignardLab/tapenade.git
 ```
+
+## Usage
+
+## Complementary Napari plugins (for graphical user interfaces)
+
 
 ## Contributing
 
