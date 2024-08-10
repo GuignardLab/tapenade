@@ -361,61 +361,62 @@ def register(
     ordered_init_trsfs: bool = True,
 ):
 
-    # Register the two sides of the sample, using the previously computed transformation (if any) or computing a new one
-    # """
-    # Parameters
-    # ----------
-    # path_data : str
-    #     path to the raw images. In the folder structure : folder_experiment/sample_id/raw
-    # path_transformation : str
-    #     path to the folder where the transformations files are saved. In the folder structure : folder_experiment/sample_id/trsf
-    # path_registered_data : str
-    #     path where the registered images will be saved. In the folder structure : folder_experiment/sample_id/registered
-    # reference_image : str
-    #     name of the reference image, the 'fixed' one
-    # floating_image : str
-    #     name of the floating image, the one that will be registered onto the reference image
-    # input_voxel : tuple, optional
-    #     voxel size of the input image, by default [1,1,1]
-    # output_voxel : tuple, optional
-    #     voxel size of the output image, by default [1,1,1]. Can be different from the input voxel size.
-    # compute_trsf : int, optional
-    #     1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as the reference, register this channel using compute_trsf=1.
-    #     Then you can use compute_trsf=0, the algo will find the pre-existing transformation to register the other channels onto the reference channel.
-    # rot : list, optional
-    #     list of the rotations to apply to the floating image, by default [0,0,0]
-    # trans1 : list, optional
-    #     list of the translations to apply to the floating image BEFORE ROTATION, by default [0,0,0]
-    # trans2 : list, optional
-    #     list of the translations to apply to the floating image AFTER ROTATION, by default [0,0,0]
-    # other_trsf : list, optional.
-    #     list of transformations to apply to the floating image, by default [], if you want give direclty your transformations.
-    #     If this argument is not None, the value of the parameters rot, trans1, trans2 will be ignored.
-    #     You can use flipping (flip), rotations (rot), translation (trans). Specify the axis X,Y or Z after the sample_id of the transformation. For rotations and translation, precise the value (angle or distance) after the axis.
-    #     IMPORTANT : Needs 2 sets of brackets.
-    #     If order_init_trsfs is True, the transformations will be applied in the order they are given in the list init_trsfs.
-    #     # Example : [['flip', 'Z', 'trans', 'Z', -10,'trans','Y',100,'rot','X',-29,'rot','Y',41,'rot','Z',-2]]
-    # input_init_trsf_from_plugin : str, optional
-    #     path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file no matter the parameters rot, trans1, trans2 or other_trsf
-    # test_init : int, optional
-    #     1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0. 
-    # trsf_type : str, optional
-    #     type of transformation to compute : rigid, affine. By default rigid.
-    # depth : int, optional
-    #     depth of the registration, by default 3
-    # bbox : int, optional
-    #     1 if the bounding box of the original image can extend, 0 if not.
-    # image_interpolation : str, optional
-    #     type of interpolation to apply to the image, by default 'linear'
-    # padding : int, optional
-    #     padding to apply to the image, by default 0
-    # save_json : str
-    #     if not None, save the parameters of that function in a json file at the path given.
-    #     IMPORTANT : saves the parameters of the function, not the parameters of the registration, in particular the initial transformations only. To save the actual transformations, use the function "compute_transformation_from_trsf_files"
-    # ordered_init_trsfs : bool, optional
-    #     if True, the transformations will be applied in the order they are given in the list init_trsfs.
+    """
+    Register the two sides of the sample, using the previously computed transformation (if any) or computing a new one
+    
+    Parameters
+    ----------
+    path_data : str
+        path to the raw images. In the folder structure : folder_experiment/sample_id/raw
+    path_transformation : str
+        path to the folder where the transformations files are saved. In the folder structure : folder_experiment/sample_id/trsf
+    path_registered_data : str
+        path where the registered images will be saved. In the folder structure : folder_experiment/sample_id/registered
+    reference_image : str
+        name of the reference image, the 'fixed' one
+    floating_image : str
+        name of the floating image, the one that will be registered onto the reference image
+    input_voxel : tuple, optional
+        voxel size of the input image, by default [1,1,1]
+    output_voxel : tuple, optional
+        voxel size of the output image, by default [1,1,1]. Can be different from the input voxel size.
+    compute_trsf : int, optional
+        1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as the reference, register this channel using compute_trsf=1.
+        Then you can use compute_trsf=0, the algo will find the pre-existing transformation to register the other channels onto the reference channel.
+    rot : list, optional
+        list of the rotations to apply to the floating image, by default [0,0,0]
+    trans1 : list, optional
+        list of the translations to apply to the floating image BEFORE ROTATION, by default [0,0,0]
+    trans2 : list, optional
+        list of the translations to apply to the floating image AFTER ROTATION, by default [0,0,0]
+    other_trsf : list, optional.
+        list of transformations to apply to the floating image, by default [], if you want give direclty your transformations.
+        If this argument is not None, the value of the parameters rot, trans1, trans2 will be ignored.
+        You can use flipping (flip), rotations (rot), translation (trans). Specify the axis X,Y or Z after the sample_id of the transformation. For rotations and translation, precise the value (angle or distance) after the axis.
+        IMPORTANT : Needs 2 sets of brackets.
+        If order_init_trsfs is True, the transformations will be applied in the order they are given in the list init_trsfs.
+        # Example : [['flip', 'Z', 'trans', 'Z', -10,'trans','Y',100,'rot','X',-29,'rot','Y',41,'rot','Z',-2]]
+    input_init_trsf_from_plugin : str, optional
+        path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file no matter the parameters rot, trans1, trans2 or other_trsf
+    test_init : int, optional
+        1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0. 
+    trsf_type : str, optional
+        type of transformation to compute : rigid, affine. By default rigid.
+    depth : int, optional
+        depth of the registration, by default 3
+    bbox : int, optional
+        1 if the bounding box of the original image can extend, 0 if not.
+    image_interpolation : str, optional
+        type of interpolation to apply to the image, by default 'linear'
+    padding : int, optional
+        padding to apply to the image, by default 0
+    save_json : str
+        if not None, save the parameters of that function in a json file at the path given.
+        IMPORTANT : saves the parameters of the function, not the parameters of the registration, in particular the initial transformations only. To save the actual transformations, use the function "compute_transformation_from_trsf_files"
+    ordered_init_trsfs : bool, optional
+        if True, the transformations will be applied in the order they are given in the list init_trsfs.
 
-    # """
+    """
     if rot is None:
         rot = [0, 0, 0]
     if trans1 is None:

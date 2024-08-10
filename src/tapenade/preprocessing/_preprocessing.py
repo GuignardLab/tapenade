@@ -6,15 +6,17 @@ from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 
-from tapenade.preprocessing._isotropize import _make_array_isotropic
+from tapenade.preprocessing._array_rescaling import _change_arrays_pixelsize
 from tapenade.preprocessing._local_equalization import _local_equalization
 from tapenade.preprocessing._thresholding import _compute_mask
 from tapenade.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
 from tapenade.preprocessing._intensity_normalization import _normalize_intensity
+from tapenade.preprocessing._smoothing import _parallel_gaussian_smooth, _masked_smooth_gaussian
+
 
 """
 #! TODO:
@@ -35,9 +37,9 @@ In typical order:
 """
 
 
-def _parallel_make_array_isotropic(arrays, reshape_factors, order):
+def _parallel_change_arrays_pixelsize(arrays, reshape_factors, order):
     mask, image, labels = arrays
-    return _make_array_isotropic(
+    return _change_arrays_pixelsize(
         mask=mask,
         image=image,
         labels=labels,
@@ -75,7 +77,7 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:in
         liste_channels = np.linspace(0,nb_channels-1,nb_channels,dtype=int)
         for ch in liste_channels :
             channel = image[:,ch,:,:]
-            (mask_iso,channel_iso,seg_iso)= make_array_isotropic(mask=mask,image=channel,labels=labels,input_pixelsize=scale,output_pixelsize=(1,1,1),order=1,n_jobs=-1)   
+            (mask_iso,channel_iso,seg_iso)= change_arrays_pixelsize(mask=mask,image=channel,labels=labels,input_pixelsize=scale,output_pixelsize=(1,1,1),order=1,n_jobs=-1)   
             iso_image.append(channel_iso)
 
         iso_image = np.array(iso_image)
@@ -91,12 +93,12 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:in
         norm_image[:,pos_ref,:,:] = ref_norm
 
     else : #3D data, one channel
-        (mask_iso,iso_image,seg_iso)= make_array_isotropic(mask=mask,image=image,labels=labels,reshape_factors=np.divide(scale,(1,1,1)))   
+        (mask_iso,iso_image,seg_iso)= change_arrays_pixelsize(mask=mask,image=image,labels=labels,reshape_factors=np.divide(scale,(1,1,1)))   
         norm_image,_ = normalize_intensity(image=iso_image,ref_image=iso_image,mask=mask_iso,labels=seg_iso,sigma=sigma)
 
     return(mask_iso,norm_image,seg_iso)
 
-def make_array_isotropic(
+def change_arrays_pixelsize(
     mask: np.ndarray = None,
     image: np.ndarray = None,
     labels: np.ndarray = None,
@@ -150,7 +152,7 @@ def make_array_isotropic(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_arrays = [
-                _make_array_isotropic(ma, im, labs, input_pixelsize, output_pixelsize, order=order)
+                _change_arrays_pixelsize(ma, im, labs, input_pixelsize, output_pixelsize, order=order)
                 for ma, im, labs in tqdm(
                     zip(mask, image, labels),
                     desc="Making array isotropic",
@@ -161,7 +163,7 @@ def make_array_isotropic(
         else:
             # Parallel resizing of each time frame using multiple processes
             func_parallel = partial(
-                _parallel_make_array_isotropic,
+                _parallel_change_arrays_pixelsize,
                 input_pixelsize=input_pixelsize,
                 output_pixelsize=output_pixelsize,
                 order=order,
@@ -181,7 +183,7 @@ def make_array_isotropic(
 
     else:
         # Resizing the whole image
-        resized_arrays = _make_array_isotropic(
+        resized_arrays = _change_arrays_pixelsize(
             mask, image, labels, 
             input_pixelsize=input_pixelsize,
             output_pixelsize=output_pixelsize,
@@ -609,3 +611,213 @@ def crop_array_using_mask(
         return mask_cropped, labels_cropped
     else:
         return mask_cropped 
+    
+
+def masked_gaussian_smooth(
+    image: np.ndarray,
+    sigmas: Union[float, List[float]],
+    mask: Optional[np.ndarray] = None,
+    mask_for_volume: Optional[np.ndarray] = None,
+    n_jobs: int = -1,
+) -> np.ndarray:
+    """
+    Apply Gaussian smoothing to an image or a sequence of images.
+
+    Args:
+        image (ndarray): The input image or sequence of images.
+        sigmas (float or list of floats): The standard deviation(s) of the Gaussian kernel.
+        mask (ndarray, optional): The mask indicating the regions of interest. Default is None.
+        mask_for_volume (ndarray, optional): The mask indicating the regions of interest for volume calculation. Default is None.
+        n_jobs (int, optional): The number of parallel jobs to run. Default is -1, which uses all available CPU cores.
+
+    Returns:
+        ndarray: The smoothed image or sequence of images.
+    """
+
+    is_temporal = image.ndim == 4
+
+    if is_temporal:
+
+        if mask is None:
+            mask = [None] * image.shape[0]
+
+        if mask_for_volume is None:
+            mask_for_volume = [None] * image.shape[0]
+
+        func = partial(_parallel_gaussian_smooth, sigmas=sigmas)
+
+        if n_jobs == 1:
+
+            iterable = tqdm(
+                zip(image, mask, mask_for_volume), total=len(image), desc="Smoothing image"
+            )
+
+            return np.array([func(elem) for elem in iterable])
+
+        else:
+            elems = [elem for elem in zip(image, mask)]
+
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
+            result = process_map(
+                func, elems, max_workers=max_workers, desc="Smoothing image"
+            )
+
+            return np.array(result)
+
+    else:
+        return _masked_smooth_gaussian(image, sigmas, mask, mask_for_volume)
+    
+
+
+
+
+
+
+def masked_gaussian_smooth_dense_two_arrays_gpu(
+    datas: List[np.ndarray],
+    sigmas: Union[float, List[float]],
+    mask: np.ndarray = None,
+    masks_for_volume: Union[np.ndarray, List[np.ndarray]] = None,
+):
+    """
+    Inputs in data are assumed to be non-temporal, 3D arrays.
+    """
+
+    from pyclesperanto_prototype import gaussian_blur
+    
+
+    if isinstance(sigmas, (int, float)):
+        sigmas = [sigmas] * 3
+
+    if mask is None:
+        smoothed1 = np.array(gaussian_blur(
+            datas[0].astype(np.float16), 
+            sigma_x=sigmas[0], 
+            sigma_y=sigmas[1], 
+            sigma_z=sigmas[2]
+        ))
+        smoothed2 = np.array(gaussian_blur(
+            datas[1].astype(np.float16), 
+            sigma_x=sigmas[0], 
+            sigma_y=sigmas[1], 
+            sigma_z=sigmas[2]
+        ))
+
+    elif masks_for_volume is None:
+
+        smoothed1 = np.array(gaussian_blur(
+            np.where(mask, datas[0].astype(np.float16), 0.0),
+            sigma_x=sigmas[0],
+            sigma_y=sigmas[1],
+            sigma_z=sigmas[2],
+        ))
+
+        smoothed2 = np.array(gaussian_blur(
+            np.where(mask, datas[1].astype(np.float16), 0.0),
+            sigma_x=sigmas[0],
+            sigma_y=sigmas[1],
+            sigma_z=sigmas[2],
+        ))
+
+        effective_volume = np.array(gaussian_blur(
+            mask.astype(np.float16),
+            sigma_x=sigmas[0],
+            sigma_y=sigmas[1],
+            sigma_z=sigmas[2],
+        ))
+
+        smoothed1 = np.where(
+            mask,
+            np.divide(smoothed1, effective_volume, where=mask),
+            0.0
+        )
+
+        smoothed2 = np.where(
+            mask,
+            np.divide(smoothed2, effective_volume, where=mask),
+            0.0
+        )
+
+    else: # both masks and masks_for_volume are not None
+
+        if isinstance(masks_for_volume, np.ndarray):
+            
+            smoothed1 = np.array(gaussian_blur(
+                np.where(masks_for_volume, datas[0].astype(np.float16), 0.0),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+
+            smoothed2 = np.array(gaussian_blur(
+                np.where(masks_for_volume, datas[1].astype(np.float16), 0.0),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+
+            effective_volume = np.array(gaussian_blur(
+                masks_for_volume.astype(np.float16),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+
+            smoothed1 = np.where(
+                mask,
+                np.divide(smoothed1, effective_volume, where=mask),
+                0.0
+            )
+
+            smoothed2 = np.where(
+                mask,
+                np.divide(smoothed2, effective_volume, where=mask),
+                0.0
+            )
+
+
+        elif isinstance(masks_for_volume, list):
+
+            smoothed1 = np.array(gaussian_blur(
+                np.where(masks_for_volume[0], datas[0].astype(np.float16), 0.0),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+        
+            smoothed2 = np.array(gaussian_blur(
+                np.where(masks_for_volume[1], datas[1].astype(np.float16), 0.0),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+
+            effective_volume1 = np.array(gaussian_blur(
+                masks_for_volume[0].astype(np.float16),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+
+            effective_volume2 = np.array(gaussian_blur(
+                masks_for_volume[1].astype(np.float16),
+                sigma_x=sigmas[0],
+                sigma_y=sigmas[1],
+                sigma_z=sigmas[2],
+            ))
+
+            smoothed1 = np.where(
+                mask,
+                np.divide(smoothed1, effective_volume1, where=mask),
+                0.0
+            )
+
+            smoothed2 = np.where(
+                mask,
+                np.divide(smoothed2, effective_volume2, where=mask),
+                0.0
+            )
+
+    return smoothed1, smoothed2

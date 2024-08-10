@@ -13,7 +13,7 @@ except ImportError:
 import os
 from pathlib import Path
 
-from tapenade.preprocessing import make_array_isotropic
+from tapenade.preprocessing import change_arrays_pixelsize
 
 
 def predict_stardist(
@@ -36,7 +36,7 @@ def predict_stardist(
     directory = str(os.path.split(model_path)[0])
     model = StarDist3D(None, name=model_name, basedir=directory)
 
-    data = make_array_isotropic(
+    data = change_arrays_pixelsize(
         image=array, 
         input_pixelsize=input_voxelsize, 
         output_pixelsize=voxelsize_model,
@@ -47,7 +47,7 @@ def predict_stardist(
     labels, _ = model.predict_instances(
         data, axes="ZYX", n_tiles=model._guess_n_tiles(data)
     )
-    aniso_labels = make_array_isotropic(
+    aniso_labels = change_arrays_pixelsize(
         labels=labels,
         input_pixelsize=voxelsize_model,
         output_pixelsize=input_voxelsize,

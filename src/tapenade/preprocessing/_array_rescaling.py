@@ -4,7 +4,7 @@ from typing import Tuple
 
 
 
-def _make_array_isotropic(
+def _change_arrays_pixelsize(
         mask: np.ndarray = None, 
         image: np.ndarray = None,
         labels: np.ndarray = None,

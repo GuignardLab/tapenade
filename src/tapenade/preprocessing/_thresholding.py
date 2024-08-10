@@ -2,13 +2,11 @@ import numpy as np
 
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage.morphology import binary_fill_holes
-from scipy.signal import argrelextrema
 from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.morphology import convex_hull_image
 from skimage.transform import resize, rescale
 from tapenade.preprocessing._smoothing import _smooth_gaussian
-from time import time
 
 
 def _snp_threshold_binarization(
