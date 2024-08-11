@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from tapenade.preprocessing._smoothing import _smooth_gaussian
+from tapenade.preprocessing._smoothing import _masked_smooth_gaussian
 
 
 def _median_absolute_deviation(array: np.ndarray) -> float:
@@ -19,7 +19,7 @@ def _optimize_sigma(
     def opt_func(
         sigma, ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray
     ):
-        ref_array_smooth = _smooth_gaussian(
+        ref_array_smooth = _masked_smooth_gaussian(
             ref_array, sigmas=sigma, mask_for_volume=labels_mask, mask=mask
         )
 
@@ -85,7 +85,7 @@ def _normalize_intensity(
     if sigma is None:
         sigma = _optimize_sigma(ref_array, mask, labels_mask)
         print("sigma = ", sigma)
-    ref_array_smooth = _smooth_gaussian(
+    ref_array_smooth = _masked_smooth_gaussian(
         ref_array, sigmas=sigma, mask_for_volume=labels_mask, mask=mask
     )
 

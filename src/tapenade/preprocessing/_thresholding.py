@@ -6,7 +6,7 @@ from skimage.measure import label
 from skimage.morphology import convex_hull_image
 from skimage.transform import rescale, resize
 
-from tapenade.preprocessing._smoothing import _smooth_gaussian
+from tapenade.preprocessing._smoothing import _masked_smooth_gaussian
 
 
 def _snp_threshold_binarization(
@@ -33,9 +33,9 @@ def _snp_threshold_binarization(
     if registered_image:
         nonzero_mask = image > 0
 
-        blurred = _smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
+        blurred = _masked_smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
 
-        blurred2 = _smooth_gaussian(
+        blurred2 = _masked_smooth_gaussian(
             image**2, mask=nonzero_mask, sigmas=sigma_blur
         )
 
@@ -48,8 +48,8 @@ def _snp_threshold_binarization(
             snp_array, where=np.logical_and(nonzero_mask, snp_mask)
         )
     else:
-        blurred = _smooth_gaussian(image, sigmas=sigma_blur)
-        blurred2 = _smooth_gaussian(image**2, sigmas=sigma_blur)
+        blurred = _masked_smooth_gaussian(image, sigmas=sigma_blur)
+        blurred2 = _masked_smooth_gaussian(image**2, sigmas=sigma_blur)
 
         sigma = blurred2 - blurred**2
 
