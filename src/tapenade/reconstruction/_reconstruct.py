@@ -147,18 +147,27 @@ def create_folders(
         image_float = io.imread(
             Path(folder_experiment) / f"{filename_float}.tif"
         )
-        
-        for ind_ch, ch in enumerate(channels):
-            imref = (image_ref[:, :, :,ind_ch])
-            imfloat = (image_float[:,:,:,ind_ch])
+        if len(channels)>1 :
+            for ind_ch, ch in enumerate(channels):
+                imref = (image_ref[:, :, :,ind_ch])
+                imfloat = (image_float[:,:,:,ind_ch])
+                io.imsave(
+                    Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
+                    imref, ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
+                )  # ,imagej=True, metadata={'axes': 'TZYX'})
+                io.imsave(
+                    Path(folder_sample) / "raw" / f"{filename_float}_{ch}.tif",
+                    imfloat,
+                )  # ,imagej=True, metadata={'axes': 'TZYX'})>
+        else :
             io.imsave(
-                Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
-                imref, ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
-            )  # ,imagej=True, metadata={'axes': 'TZYX'})
+                Path(folder_sample) / "raw" / f"{filename_ref}_{channels[0]}.tif",
+                image_ref, ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
+            )
             io.imsave(
-                Path(folder_sample) / "raw" / f"{filename_float}_{ch}.tif",
-                imfloat,
-            )  # ,imagej=True, metadata={'axes': 'TZYX'})>
+                Path(folder_sample) / "raw" / f"{filename_float}_{channels[0]}.tif",
+                image_float,
+            )  
 
 def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
     """
@@ -179,7 +188,7 @@ def transformation_from_plugin(path_json: str,scale: tuple = (1, 1, 1)):
     trans_y = data["trans_y"]
     trans_x = data["trans_x"]
     #in the napari plugin, the translation computed is the one after the rotation, so we need to set the translation trans1 before rotation to 0
-    init_trsfs = list_init_trsf(trans1=[0, 0, 0], trans2=[trans_z, trans_y, trans_x], rot=[rot_x, rot_y, rot_z], scale=scale)
+    init_trsfs = list_init_trsf(trans1=[0, 0, 0], trans2=[trans_z, trans_y, trans_x], rot=[rot_x, rot_y, rot_z])
     return (init_trsfs)
 
 def manual_registration_fct(
@@ -336,7 +345,6 @@ def compute_transformation_from_trsf_files(path_trsf:str):
     angles_deg=[math.degrees(angles[0]), math.degrees(angles[1]), math.degrees(angles[2])]
     print("rotation angles (X,Y,Z) in deg:",angles_deg)
     print("translation vector:",trans)
-
 def register(
     path_data: str,
     path_transformation: str,
@@ -603,7 +611,7 @@ def fuse_sides(
     cumsum_normalized = cumsum / np.max(cumsum)
 
     # apply a sigmoid function to the linear weights, to get a smooth transition between the two sides
-    w2 = sigmoid(cumsum_normalized, x0=0.5, p=slope_coeff)
+    w2 = sigmoid(cumsum_normalized, z0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
     fusion = (ref_image * w1 + float_image * w2)
@@ -632,12 +640,12 @@ def write_hyperstacks(
     image = io.imread(
         Path(path) / f"{sample_id}_{channels[0]}.tif")  # reading one image just to extract the shape of the image and initialize the hyperstack
     (z, y, x) = image.shape
-    new_image = np.zeros((z, y, x,len(channels)))
+    new_image = np.zeros((z ,len(channels),y, x))
     for ch in range(len(channels)):
         one_channel = io.imread(
             Path(path) / f"{sample_id}_{channels[ch]}.tif")
         print(one_channel.shape)
-        new_image[:, :, :,ch] = one_channel
+        new_image[:, ch,:, :] = one_channel
 
     if return_image:
         return new_image
