@@ -12,13 +12,6 @@ A fully-visual pipeline for quantitative analysis of 3D organoid images acquired
 
 If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade/blob/main/README.md#how-to-cite).
 
-This repository has been developed by (in alphabetical order):
-
-- [Alice Gros](mailto:alice.gros@univ-amu.fr)
-- [Jules Vanaret](mailto:jules.vanaret@univ-amu.fr)
-- [Léo Guignard](mailto:leo.guignard@univ-amu.fr)
-- [Valentin Dunsing-Eichenauer](valentin.dunsing@univ-amu.fr)
-
 ----------------------------------
 
 ## Table of contents
@@ -134,9 +127,14 @@ The user can dynamically interact with the correlation heatmap by manually selec
 
 If you use this plugin for your research, please cite us using the following reference:
 
+[DOI in progress]
 
+This repository has been developed by (in alphabetical order):
 
-
+- [Alice Gros](mailto:alice.gros@univ-amu.fr)
+- [Jules Vanaret](mailto:jules.vanaret@univ-amu.fr)
+- [Léo Guignard](mailto:leo.guignard@univ-amu.fr)
+- [Valentin Dunsing-Eichenauer](valentin.dunsing@univ-amu.fr)
 
 ## Contributing
 
