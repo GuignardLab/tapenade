@@ -18,7 +18,7 @@ from tapenade.preprocessing._intensity_normalization import (
 from tapenade.preprocessing._local_equalization import _local_equalization
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
-    _parallel_gaussian_smooth,
+    _masked_smooth_gaussian_sparse
 )
 from tapenade.preprocessing._thresholding import _compute_mask
 
@@ -674,6 +674,13 @@ def crop_array_using_mask(
         return mask_cropped
 
 
+def _parallel_gaussian_smooth(
+    input_tuple: tuple[np.ndarray, np.ndarray],
+    sigmas: Union[float, list[float]],
+) -> np.ndarray:
+    data, mask, mask_for_volume = input_tuple
+    return _masked_smooth_gaussian(data, sigmas, mask, mask_for_volume)
+
 def masked_gaussian_smooth(
     image: np.ndarray,
     sigmas: Union[float, list[float]],
@@ -897,3 +904,129 @@ def masked_gaussian_smooth_dense_two_arrays_gpu(
             )
 
     return smoothed1, smoothed2
+
+def masked_gaussian_smooth_sparse(
+    sparse_array: Union[np.ndarray, list[np.ndarray]],
+    is_temporal: bool,
+    dim_space: int,
+    sigmas: Union[float, tuple[float]],
+    positions: np.ndarray = None,
+    n_job: int = -1,
+    progress_bars: bool = True,
+):
+    """
+    Smooth sparse data using a gaussian kernel.
+    Sparse data is a numpy array with the first columns being the spatial coordinates,
+    and the last columns being values of interest.
+
+    Parameters
+    ----------
+    sparse_array : np.ndarray or list of np.ndarray
+        Array of points to smooth in format (n_points, n_dim_space + n_dim_points). 
+        The first columns (up to dim_space, i.e [:dim_space]) must be the spatial coordinates. 
+        The remaining columns are the values/vectors to smooth. A temporal sparse array is a 
+        list of sparse arrays, one for each time point.
+    is_temporal : bool
+        If True, the array is temporal and the smoothing is applied to each time step.
+    dim_space : int
+        Number of spatial dimensions.
+    sigmas : float or list of float
+        Standard deviations of the gaussian kernel.
+    positions : np.ndarray, optional
+        Positions where the smoothing is applied. If None, the smoothing is applied to the
+        positions of the input array.
+    mask : np.ndarray, optional
+        Mask to apply to the positions. If None, no mask is applied.
+    n_job : int, optional
+        Number of jobs to run in parallel. If -1, all the available CPUs are used.
+        The default is -1.
+
+    Returns
+    -------
+    np.ndarray
+        The smoothed sparse array.
+    """
+
+    positions_is_temporal = isinstance(positions, list)
+
+    if is_temporal:
+
+        if n_job == 1:
+
+            if positions_is_temporal:
+                return np.array(
+                    [
+                        _masked_smooth_gaussian_sparse(
+                            elem, pos, sigmas, dim_space
+                        )
+                        for elem, pos in tqdm(
+                            zip(
+                                sparse_array,
+                                positions,
+                                disable=not progress_bars,
+                            )
+                        )
+                    ]
+                )
+
+            else:
+                return np.array(
+                    [
+                        _masked_smooth_gaussian_sparse(
+                            elem, positions, sigmas, dim_space
+                        )
+                        for elem in tqdm(
+                            sparse_array, disable=not progress_bars
+                        )
+                    ]
+                )
+
+        else:
+            if not positions_is_temporal:
+                # same positions for all time steps
+                func = partial(
+                    _masked_smooth_gaussian_sparse,
+                    sigmas=sigmas,
+                    dim_space=dim_space,
+                    positions=positions,
+                )
+
+                max_workers = (
+                    cpu_count() if n_job == -1 else min(n_job, cpu_count())
+                )
+                result = np.array(
+                    process_map(
+                        func,
+                        sparse_array,
+                        max_workers=max_workers,
+                        disable=not progress_bars,
+                    )
+                )
+
+            else:
+                func = partial(
+                    _masked_smooth_gaussian_sparse,
+                    sigmas=sigmas,
+                    dim_space=dim_space,
+                )
+
+                max_workers = (
+                    cpu_count() if n_job == -1 else min(n_job, cpu_count())
+                )
+                result = process_map(
+                    func,
+                    sparse_array,
+                    positions,
+                    max_workers=max_workers,
+                    disable=not progress_bars,
+                )
+
+            return result
+
+    else:
+        return _masked_smooth_gaussian_sparse(
+            array=sparse_array,
+            positions=positions,
+            sigmas=sigmas,
+            dim_space=dim_space,
+        )

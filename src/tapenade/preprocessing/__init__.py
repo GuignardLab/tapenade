@@ -7,6 +7,7 @@ from ._preprocessing import (
     crop_array_using_mask,
     masked_gaussian_smooth,
     masked_gaussian_smooth_dense_two_arrays_gpu,
+    masked_gaussian_smooth_sparse
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "crop_array_using_mask",
     "masked_gaussian_smooth",
     "masked_gaussian_smooth_dense_two_arrays_gpu",
+    "masked_gaussian_smooth_sparse",
 ]
