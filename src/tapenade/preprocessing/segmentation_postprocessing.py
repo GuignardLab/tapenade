@@ -1,6 +1,8 @@
-import numpy as np
 from os import cpu_count
+
+import numpy as np
 from tqdm.contrib.concurrent import process_map
+
 from tapenade.preprocessing._labels_masking import (
     _remove_labels_outside_of_mask,
 )
@@ -29,7 +31,7 @@ def remove_labels_outside_of_mask(
             labels_filtered = np.array(
                 [
                     _remove_labels_outside_of_mask(lab, ma)
-                    for lab, ma in zip(labels, mask)
+                    for lab, ma in zip(labels, mask, strict=False)
                 ]
             )
         else:
