@@ -75,7 +75,7 @@ class SpatialCorrelationPlotter:
 
     def get_heatmap_figure(
         self,
-        bins: tuple = (20, 20),
+        bins: tuple = (40, 40),
         show_individual_cells: bool = False,
         show_linear_fit: bool = True,
         normalize_quantities: bool = False,
