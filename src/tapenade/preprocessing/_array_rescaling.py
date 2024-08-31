@@ -1,13 +1,12 @@
 from scipy.ndimage import zoom
 import numpy as np
-from typing import Tuple
 
 
 
 def _change_array_pixelsize(
         array: np.ndarray,
-        input_pixelsize: Tuple[float, float, float] = (1, 1, 1),
-        output_pixelsize: Tuple[float, float, float] = (1, 1, 1),
+        input_pixelsize: tuple[float, float, float] = (1, 1, 1),
+        output_pixelsize: tuple[float, float, float] = (1, 1, 1),
         order: int = 1
     ):
     """

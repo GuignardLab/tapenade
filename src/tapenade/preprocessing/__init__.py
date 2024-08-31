@@ -1,5 +1,5 @@
 from ._preprocessing import (
-    change_arrays_pixelsize,
+    change_array_pixelsize,
     compute_mask,
     local_image_equalization,
     normalize_intensity,
@@ -11,7 +11,7 @@ from ._preprocessing import (
 )
 
 __all__ = [
-    "change_arrays_pixelsize",
+    "change_array_pixelsize",
     "compute_mask",
     "local_image_equalization",
     "normalize_intensity",

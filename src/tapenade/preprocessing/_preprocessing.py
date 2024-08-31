@@ -128,8 +128,8 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:in
 
 def change_array_pixelsize(
     array: np.ndarray,
-    input_pixelsize: Tuple[float, float, float] = (1, 1, 1),
-    output_pixelsize: Tuple[float, float, float] = (1, 1, 1),
+    input_pixelsize: tuple[float, float, float] = (1, 1, 1),
+    output_pixelsize: tuple[float, float, float] = (1, 1, 1),
     order: int = 1,
     n_jobs: int = -1,
 ) -> np.ndarray:
