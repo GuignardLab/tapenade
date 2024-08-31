@@ -8,7 +8,7 @@ from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from tapenade.preprocessing._rescaling import _change_array_pixelsize
+from tapenade.preprocessing._array_rescaling import _change_array_pixelsize
 from tapenade.preprocessing._local_equalization import _local_equalization
 from tapenade.preprocessing._thresholding import _compute_mask
 from tapenade.preprocessing._axis_alignment import (
