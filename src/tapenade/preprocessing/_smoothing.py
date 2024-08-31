@@ -1,24 +1,21 @@
+from typing import Union
+
+import numba
 import numpy as np
-import os
-
-from functools import partial
 from scipy.ndimage import gaussian_filter as scipy_gaussian
-from tqdm.contrib.concurrent import process_map
-
-from tqdm import tqdm
-from typing import Union, Optional, List, Tuple
+from scipy.spatial import KDTree
 
 
-def _smooth_gaussian(array, sigmas, mask=None, mask_for_volume=None):
+def _masked_smooth_gaussian(array: np.ndarray, sigmas: Union[float, tuple], 
+                            mask: np.ndarray = None, mask_for_volume: np.ndarray = None):
     """
     If 'mask' is specified, the convolution will not take the
     masked value into account.
     """
 
-    sigmas = sigmas if isinstance(sigmas, (int, float)) else np.array(sigmas)
+    sigmas = sigmas if isinstance(sigmas, int | float) else np.array(sigmas)
 
     if mask is None:
-        # return skimage_gaussian(array, sigmas, preserve_range=True, mode='constant', cval=0.0)
         return scipy_gaussian(array, sigmas, mode="nearest", cval=0.0)
     else:
 
@@ -37,7 +34,11 @@ def _smooth_gaussian(array, sigmas, mask=None, mask_for_volume=None):
             # calculate renormalization factor for masked gaussian (the 'effective'
             # volume of the gaussian kernel taking the mask into account)
             effective_volume = scipy_gaussian(
-                mask.astype(np.float32), sigmas, mode="constant", cval=0.0, truncate=3.0
+                mask.astype(np.float32),
+                sigmas,
+                mode="constant",
+                cval=0.0,
+                truncate=3.0,
             )
 
         else:
@@ -70,219 +71,74 @@ def _smooth_gaussian(array, sigmas, mask=None, mask_for_volume=None):
         return smooth_array
 
 
-def _parallel_gaussian_smooth(
-    input_tuple: Tuple[np.ndarray, np.ndarray],
-    sigmas: Union[float, List[float]],
-) -> np.ndarray:
-    data, mask, mask_for_volume = input_tuple
-    return _smooth_gaussian(data, sigmas, mask, mask_for_volume)
-
-
-def _gaussian_smooth(
-    image: np.ndarray,
-    sigmas: Union[float, List[float]],
-    mask: Optional[np.ndarray] = None,
-    mask_for_volume: Optional[np.ndarray] = None,
-    n_jobs: int = -1,
-) -> np.ndarray:
+@numba.jit(nopython=True, fastmath=True)
+def _loop_numba(cols, values, dists, n_points, dim_points):
     """
-    Apply Gaussian smoothing to an image or a sequence of images.
-
-    Args:
-        image (ndarray): The input image or sequence of images.
-        sigmas (float or list of floats): The standard deviation(s) of the Gaussian kernel.
-        mask (ndarray, optional): The mask indicating the regions of interest. Default is None.
-        mask_for_volume (ndarray, optional): The mask indicating the regions of interest for volume calculation. Default is None.
-        n_jobs (int, optional): The number of parallel jobs to run. Default is -1, which uses all available CPU cores.
-
-    Returns:
-        ndarray: The smoothed image or sequence of images.
+    Computes the actual smoothing kernel operation from the old to the new positions.
+    NEVER SET PARALLEL=True IN NUMBA DECORATOR, IT WILL BREAK THE CODE.
     """
 
-    is_temporal = image.ndim == 4
+    smoothed_points = np.zeros((n_points, dim_points))
+    normalization_values = np.zeros((n_points, 1))
+    # normalization_values = np.ones((n_points,1))  # * 0.1
 
-    if is_temporal:
+    for i in range(len(values)):
+        exp_dist = np.exp(-dists[i] ** 2 / 2)
+        smoothed_points[cols[i]] += values[i] * exp_dist
+        normalization_values[cols[i]] += exp_dist
 
-        if mask is None:
-            mask = [None] * image.shape[0]
+    for j in range(n_points):
+        if normalization_values[j] > 0:
+            smoothed_points[j] /= normalization_values[j]
+    # smoothed_points /= normalization_values
 
-        if mask_for_volume is None:
-            mask_for_volume = [None] * image.shape[0]
-
-        func = partial(_parallel_gaussian_smooth, sigmas=sigmas)
-
-        if n_jobs == 1:
-
-            iterable = tqdm(
-                zip(image, mask, mask_for_volume), total=len(image), desc="Smoothing image"
-            )
-
-            return np.array([func(elem) for elem in iterable])
-
-        else:
-            elems = [elem for elem in zip(image, mask)]
-
-            max_workers = (
-                os.cpu_count() if n_jobs == -1 else min(n_jobs, os.cpu_count())
-            )
-            result = process_map(
-                func, elems, max_workers=max_workers, desc="Smoothing image"
-            )
-
-            return np.array(result)
-
-    else:
-        return _smooth_gaussian(image, sigmas, mask, mask_for_volume)
-    
+    return smoothed_points
 
 
-
-
-
-
-def gaussian_smooth_dense_two_arrays_gpu(
-    datas: List[np.ndarray],
-    sigmas: Union[float, List[float]],
-    mask: np.ndarray = None,
-    masks_for_volume: Union[np.ndarray, List[np.ndarray]] = None,
-):
+def _masked_smooth_gaussian_sparse(
+        sparse_array: np.ndarray, 
+        positions: np.ndarray, 
+        sigmas: Union[float, tuple],
+        dim_space: int = 3
+    ):
     """
-    Inputs in data are assumed to be non-temporal, 3D arrays.
+    Use this function to smooth a sparse array using a Gaussian kernel
+    if you expect the output to be a sparse array as well.
+
+    A sparse array is an array of dimension (n_points, n_dim_space + n_dim_points)
+    where n_dim_space is the number of spatial dimensions and n_dim_points is the number
+    of dimensions of the signal at each point, e.g n_dim_points = 1 for a scalar field,
+    n_dim_points = 3 for a 3D vector field, n_dim_points = 9 for a 3x3 matrix field, etc.
+
+    For instance, with a 3D vector field, sparse_array[0] = [z0, y0, x0, v0z, v0y, v0x],
     """
 
-    from pyclesperanto_prototype import gaussian_blur
-    
+    sigmas = np.array(sigmas).reshape((1, -1))
 
-    if isinstance(sigmas, (int, float)):
-        sigmas = [sigmas] * 3
+    old_positions = sparse_array[:, :dim_space]
+    positions = positions if positions is not None else old_positions.copy()
 
-    if mask is None:
-        smoothed1 = np.array(gaussian_blur(
-            datas[0].astype(np.float16), 
-            sigma_x=sigmas[0], 
-            sigma_y=sigmas[1], 
-            sigma_z=sigmas[2]
-        ))
-        smoothed2 = np.array(gaussian_blur(
-            datas[1].astype(np.float16), 
-            sigma_x=sigmas[0], 
-            sigma_y=sigmas[1], 
-            sigma_z=sigmas[2]
-        ))
+    old_tree = KDTree(old_positions / sigmas)
+    new_tree = KDTree(positions / sigmas)
 
-    elif masks_for_volume is None:
+    n_dim = sparse_array.shape[1]
+    dim_points = n_dim - dim_space
+    n_points = positions.shape[0]
 
-        smoothed1 = np.array(gaussian_blur(
-            np.where(mask, datas[0].astype(np.float16), 0.0),
-            sigma_x=sigmas[0],
-            sigma_y=sigmas[1],
-            sigma_z=sigmas[2],
-        ))
+    smoothed_array = np.zeros((positions.shape[0], n_dim))
+    smoothed_array[:, :dim_space] = positions
 
-        smoothed2 = np.array(gaussian_blur(
-            np.where(mask, datas[1].astype(np.float16), 0.0),
-            sigma_x=sigmas[0],
-            sigma_y=sigmas[1],
-            sigma_z=sigmas[2],
-        ))
+    # Find the nearest neighbors of each point
+    sparse_dist_matrix = old_tree.sparse_distance_matrix(
+        new_tree, max_distance=3, output_type="coo_matrix"
+    )
+    cols = sparse_dist_matrix.col
+    rows = sparse_dist_matrix.row
+    dists = sparse_dist_matrix.data
+    values = sparse_array[rows, dim_space:]
 
-        effective_volume = np.array(gaussian_blur(
-            mask.astype(np.float16),
-            sigma_x=sigmas[0],
-            sigma_y=sigmas[1],
-            sigma_z=sigmas[2],
-        ))
+    smoothed_array[:, dim_space:] = _loop_numba(
+        cols, values, dists, n_points, dim_points
+    )
 
-        smoothed1 = np.where(
-            mask,
-            np.divide(smoothed1, effective_volume, where=mask),
-            0.0
-        )
-
-        smoothed2 = np.where(
-            mask,
-            np.divide(smoothed2, effective_volume, where=mask),
-            0.0
-        )
-
-    else: # both masks and masks_for_volume are not None
-
-        if isinstance(masks_for_volume, np.ndarray):
-            
-            smoothed1 = np.array(gaussian_blur(
-                np.where(masks_for_volume, datas[0].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-
-            smoothed2 = np.array(gaussian_blur(
-                np.where(masks_for_volume, datas[1].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-
-            effective_volume = np.array(gaussian_blur(
-                masks_for_volume.astype(np.float16),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-
-            smoothed1 = np.where(
-                mask,
-                np.divide(smoothed1, effective_volume, where=mask),
-                0.0
-            )
-
-            smoothed2 = np.where(
-                mask,
-                np.divide(smoothed2, effective_volume, where=mask),
-                0.0
-            )
-
-
-        elif isinstance(masks_for_volume, list):
-
-            smoothed1 = np.array(gaussian_blur(
-                np.where(masks_for_volume[0], datas[0].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-        
-            smoothed2 = np.array(gaussian_blur(
-                np.where(masks_for_volume[1], datas[1].astype(np.float16), 0.0),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-
-            effective_volume1 = np.array(gaussian_blur(
-                masks_for_volume[0].astype(np.float16),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-
-            effective_volume2 = np.array(gaussian_blur(
-                masks_for_volume[1].astype(np.float16),
-                sigma_x=sigmas[0],
-                sigma_y=sigmas[1],
-                sigma_z=sigmas[2],
-            ))
-
-            smoothed1 = np.where(
-                mask,
-                np.divide(smoothed1, effective_volume1, where=mask),
-                0.0
-            )
-
-            smoothed2 = np.where(
-                mask,
-                np.divide(smoothed2, effective_volume2, where=mask),
-                0.0
-            )
-
-    return smoothed1, smoothed2
+    return smoothed_array

@@ -1,7 +1,8 @@
-import numpy as np
-import numba
-from numba.typed import List
 from itertools import product
+
+import numba
+import numpy as np
+from numba.typed import List
 
 """
 The code for fast interpolation takes inspiration from the library fast_interp
@@ -40,7 +41,7 @@ def _compute_bounds(a, b, h, p, c, e, k):
         _compute_bounds1(a[i], b[i], h[i], p[i], c[i], e[i], k)
         for i in range(m)
     ]
-    return [list(x) for x in zip(*bounds)]
+    return [list(x) for x in zip(*bounds, strict=False)]
 
 
 def _fill3(f, fb, ox, oy, oz):
@@ -80,16 +81,16 @@ def pjit(func):
 # utility to allow construction of TypedList with Float/Int types (always promoted to float)
 
 
-def FloatList(l):
-    return List([float(lh) for lh in l])
+def FloatList(list_):
+    return List([float(lh) for lh in list_])
 
 
-def IntList(l):
-    return List([int(lh) for lh in l])
+def IntList(list_):
+    return List([int(lh) for lh in list_])
 
 
-def BoolList(l):
-    return List([bool(lh) for lh in l])
+def BoolList(list_):
+    return List([bool(lh) for lh in list_])
 
 
 ################################################################################
@@ -191,7 +192,7 @@ def _extrapolate3d(f, k, p, c, e):
     return fb
 
 
-class interp3d(object):
+class interp3d:
     def __init__(self, a, b, h, f, p=[False] * 3, c=[True] * 3, e=[0] * 3):
         """
         See the documentation for interp1d
@@ -293,9 +294,11 @@ class interp3d(object):
 
 
 def _local_equalization(
-    image: np.ndarray, box_size: int, 
-    perc_low: float, perc_high: float,
-    mask: np.ndarray = None
+    image: np.ndarray,
+    box_size: int,
+    perc_low: float,
+    perc_high: float,
+    mask: np.ndarray = None,
 ) -> np.ndarray:
     """
     Performs local histogram stretching by applying the following steps:
@@ -329,7 +332,7 @@ def _local_equalization(
     grid_shape = [int(np.ceil(s / box_length)) + 1 for s in array_shape]
     grid_positions_and_steps = [
         np.linspace(0, s - 1, n_boxes, retstep=True)
-        for s, n_boxes in zip(array_shape, grid_shape)
+        for s, n_boxes in zip(array_shape, grid_shape, strict=False)
     ]
 
     grid_positions = [positions for positions, _ in grid_positions_and_steps]
@@ -342,12 +345,12 @@ def _local_equalization(
 
     # Compute percentile values for each neighborhood
     for indices_grid, indices_percs in zip(
-        product(*grid_positions), product(*percs_positions)
+        product(*grid_positions), product(*percs_positions), strict=False
     ):
         indices_grid = np.array(indices_grid).round().astype(int)
 
         slices = []
-        for index, s in zip(indices_grid, array_shape):
+        for index, s in zip(indices_grid, array_shape, strict=False):
             start = min(max(index - box_size, 0), s - box_length)
             stop = min(max(index + box_size + 1, box_length), s)
             slices.append(slice(start, stop))
