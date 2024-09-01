@@ -116,14 +116,10 @@ def _normalize_intensity(
         max(0, z_ref_norm - width), min(num_z_slices, z_ref_norm + width)
     )
 
-    ref_array_normalization_factor = np.nanmedian(
-        ref_array_norm[sl_norm]
-    ) / np.nanmedian(ref_array[sl])
     array_normalization_factor = np.nanmedian(
         array_norm[sl_norm]
     ) / np.nanmedian(array[sl])
 
-    ref_array_norm = ref_array_norm / ref_array_normalization_factor
     array_norm = array_norm / array_normalization_factor
 
-    return (array_norm, ref_array_norm)
+    return array_norm

@@ -380,7 +380,7 @@ def normalize_intensity(
 
         if n_jobs == 1:
             # Sequential normalization of each time frame
-            normalized_arrays = [
+            normalized_array = [
                 _normalize_intensity(
                     im,
                     ref_im,
@@ -390,7 +390,7 @@ def normalize_intensity(
                     width=width,
                 )
                 for im, ref_im, ma, lab in tqdm(
-                    zip(image, ref_image, mask, labels, strict=False),
+                    zip(image, ref_image, mask, labels),
                     desc="Normalizing intensity",
                     total=image.shape[0],
                 )
@@ -410,9 +410,9 @@ def normalize_intensity(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            normalized_arrays = process_map(
+            normalized_array = process_map(
                 func_parallel,
-                zip(image, ref_image, strict=False),
+                zip(image, ref_image),
                 max_workers=max_workers,
                 desc="Normalizing intensity",
                 total=image.shape[0],
@@ -420,7 +420,7 @@ def normalize_intensity(
 
     else:
         # Single image normalization
-        normalized_arrays = _normalize_intensity(
+        normalized_array = _normalize_intensity(
             image,
             ref_image,
             sigma=sigma,
@@ -428,14 +428,8 @@ def normalize_intensity(
             labels=labels,
             width=width,
         )
-
-    if is_temporal:
-        normalized_arrays = tuple(
-            map(np.array, zip(*normalized_arrays, strict=False))
-        )
-        return normalized_arrays
-    else:
-        return normalized_arrays
+    
+    return np.array(normalized_array)
 
 
 def align_array_major_axis(
@@ -593,7 +587,7 @@ def masked_gaussian_smooth(
         if n_jobs == 1:
 
             iterable = tqdm(
-                zip(image, mask, mask_for_volume, strict=False),
+                zip(image, mask, mask_for_volume),
                 total=len(image),
                 desc="Smoothing image",
             )
@@ -601,7 +595,7 @@ def masked_gaussian_smooth(
             return np.array([func(elem) for elem in iterable])
 
         else:
-            elems = [elem for elem in zip(image, mask, strict=False)]
+            elems = [elem for elem in zip(image, mask)]
 
             max_workers = (
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
