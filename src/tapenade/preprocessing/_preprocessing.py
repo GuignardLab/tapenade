@@ -1,8 +1,10 @@
+import concurrent.futures
 from functools import partial
 from os import cpu_count
 from typing import Optional, Union
 
 import numpy as np
+import tifffile
 from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
@@ -335,7 +337,7 @@ def local_image_equalization(
         # Set the background to zero using the mask
         image_norm = np.where(mask, image_norm, 0.0)
 
-    return image_norm
+    return np.clip(image_norm, 0, 1)
 
 
 def normalize_intensity(
@@ -460,12 +462,24 @@ def align_array_major_axis(
 
     is_temporal = mask.ndim == 4
 
+    temporal_slice = slice(None) if temporal_slice is None else temporal_slice
+
+    # Compute the mask that will be used to compute the major axis.
+    # If the mask is a temporal array, the major axis is computed by aggregating the mask
+    # instances in temporal_slice.
+    mask_for_pca = (
+        np.any(mask[temporal_slice], axis=0) if is_temporal else mask
+    )
+
     # Compute the rotation angle and the indices of the rotation plane
     rotation_angle, rotation_plane_indices = (
         _compute_rotation_angle_and_indices(
-            mask, target_axis, rotation_plane, temporal_slice
+            mask_for_pca, target_axis, rotation_plane
         )
     )
+
+    if array.dtype == bool:
+        order = 0
 
     # Define the rotation functions
     func_rotate = partial(
@@ -474,6 +488,14 @@ def align_array_major_axis(
         axes=rotation_plane_indices,
         reshape=True,
         order=order,
+    )
+
+    func_rotate_mask = partial(
+        rotate,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=0,
     )
 
     if is_temporal and n_jobs != 1:
@@ -489,11 +511,106 @@ def align_array_major_axis(
             )
         )
 
+        mask_rotated = np.array(
+            process_map(
+                func_rotate_mask,
+                mask,
+                max_workers=max_workers,
+                desc="Aligning mask",
+            )
+        )
+
     else:
         # Rotate the arrays in block
         array_rotated = func_rotate(array)
+        mask_rotated = func_rotate_mask(mask)
+
+    array_rotated = np.where(mask_rotated, array_rotated, 0)
 
     return array_rotated
+
+
+def _load_array_rotate_and_save_to_file(
+    array_file: str,
+    mask_file: str,
+    index: int,
+    path_to_save: str,
+    rotation_angle: float,
+    order: int,
+    rotation_plane_indices: tuple[int, int],
+    compress_params: dict,
+):
+    array = tifffile.imread(array_file)
+    mask = tifffile.imread(mask_file)
+    array_rotated = rotate(
+        array, angle=rotation_angle, axes=rotation_plane_indices, reshape=True, order=order
+    )
+    mask_rotated = rotate(
+        mask, angle=rotation_angle, axes=rotation_plane_indices, 
+        reshape=True, order=0
+    )
+    array_rotated = np.where(mask_rotated, array_rotated, 0)
+    if order > 1:
+        # preserve the original intensity range
+        array_rotated = np.clip(array_rotated, array.min(), array.max())
+        
+    tifffile.imwrite(
+        f"{path_to_save}/aligned_{index:>04}.tif",
+        array_rotated,
+        **compress_params
+    )
+
+
+def align_array_major_axis_from_files(
+    mask_files: list[str],
+    array_files: list[str],
+    path_to_save: str,
+    compress_params: dict,
+    func_params: dict, 
+):
+    """
+    Aligns the major axis of an array to a target axis in a specified rotation plane.
+    This function uses Principal Component Analysis (PCA) to determine the major axis of the array,
+    and then rotates the array to align the major axis with the target axis.
+    """
+
+    mask_zyx_shape = tifffile.imread(mask_files[0]).shape
+    mask_for_pca = np.zeros(mask_zyx_shape[:-3], dtype=bool)
+
+    for mask_file in mask_files:
+        mask = tifffile.imread(mask_file)
+        mask_for_pca = np.logical_or(mask_for_pca, mask)
+
+    target_axis = func_params.get("target_axis", "Z")
+    rotation_plane = func_params.get("rotation_plane", "XY")
+    order = func_params.get("order", 1)
+
+    # Compute the rotation angle and the indices of the rotation plane
+    rotation_angle, rotation_plane_indices = (
+        _compute_rotation_angle_and_indices(
+            mask_for_pca, target_axis, rotation_plane
+        )
+    )
+
+    multithreaded_function = partial(
+        _load_array_rotate_and_save_to_file,
+        path_to_save=path_to_save,
+        order=order,
+        rotation_angle=rotation_angle,
+        rotation_plane_indices=rotation_plane_indices,
+        compress_params=compress_params,
+    )
+
+    n_jobs = func_params.get("n_jobs", -1)
+
+    # open all array files using the multithreading library and crop the results
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        res = list(tqdm(
+            executor.map(multithreaded_function, array_files, mask_files, range(len(array_files))),
+            total=len(array_files),
+            desc="Aligning array",
+        ))
+    
 
 
 def crop_array_using_mask(
@@ -544,12 +661,103 @@ def crop_array_using_mask(
     return array_cropped
 
 
+def _extract_slice_from_file(file: str):
+    """
+    Extract the bounding box from a file containing a binary mask.
+    """
+
+    mask = tifffile.imread(file)
+    mask_slice = regionprops(mask.astype(int))[0].slice
+
+    return mask_slice
+
+
+def _load_array_crop_and_save_to_file(
+    array_file: str,
+    index: int,
+    path_to_save: str,
+    mask_slice: tuple[slice],
+    compress_params: dict,
+):
+    array = tifffile.imread(array_file)[mask_slice]
+    tifffile.imwrite(
+        f"{path_to_save}/cropped_{index:>04}.tif",
+        array,
+        **compress_params
+    )
+
+
+def crop_array_using_mask_from_files(
+    mask_files: list[str],
+    array_files: list[str],
+    path_to_save: str,
+    compress_params: dict,
+    func_params: dict,
+) -> np.ndarray:
+    """
+    Crop an array using a binary mask. If the array is temporal, the cropping
+    slice is computed by aggregating mask instances at all times.
+    """
+
+    mask_zyx_shape = tifffile.imread(mask_files[0]).shape
+
+    # open all mask files using the multithreading library
+    mask_slices = []
+
+    n_jobs = func_params.get("n_jobs", -1)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        mask_slices = list(
+            tqdm(
+                executor.map(_extract_slice_from_file, mask_files),
+                total=len(mask_files),
+                desc="Extracting mask slices",
+            )
+        )
+
+    # aggregate the mask slices
+    mask_slice = tuple(
+        slice(
+            min([mask_slice[i].start for mask_slice in mask_slices]),
+            max([mask_slice[i].stop for mask_slice in mask_slices]),
+        )
+        for i in range(3)
+    )
+
+    margin = func_params.get("margin", 0)
+
+    # Add margin to the slice if specified
+    if margin > 0:
+        mask_slice = tuple(
+            slice(
+                max(0, mask_slice[i].start - margin),
+                min(mask_slice[i].stop + margin, mask_zyx_shape[i]),
+            )
+            for i in range(3)
+        )
+
+    multithreaded_function = partial(
+        _load_array_crop_and_save_to_file,
+        path_to_save=path_to_save,
+        mask_slice=mask_slice,
+        compress_params=compress_params,
+    )
+    # open all array files using the multithreading library and crop the results
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        res = list(tqdm(
+            executor.map(multithreaded_function, array_files, range(len(array_files))),
+            total=len(array_files),
+            desc="Cropping array",
+        ))
+
+
 def _parallel_gaussian_smooth(
     input_tuple: tuple[np.ndarray, np.ndarray],
     sigmas: Union[float, list[float]],
 ) -> np.ndarray:
     data, mask, mask_for_volume = input_tuple
     return _masked_smooth_gaussian(data, sigmas, mask, mask_for_volume)
+
 
 def masked_gaussian_smooth(
     image: np.ndarray,
@@ -774,6 +982,7 @@ def masked_gaussian_smooth_dense_two_arrays_gpu(
             )
 
     return smoothed1, smoothed2
+
 
 def masked_gaussian_smooth_sparse(
     sparse_array: Union[np.ndarray, list[np.ndarray]],
