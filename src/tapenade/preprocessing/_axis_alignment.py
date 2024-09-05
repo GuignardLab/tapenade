@@ -21,16 +21,15 @@ def _signed_angle(v1: np.ndarray, v2: np.ndarray, vn: np.ndarray) -> float:
 
 
 def _compute_rotation_angle_and_indices(
-    mask: np.ndarray,
+    mask_for_pca: np.ndarray,
     target_axis: str,
     rotation_plane: str,
-    temporal_slice: slice,
 ) -> tuple[float, tuple[int, int]]:
     """
     Compute the rotation angle and indices for axis alignment.
 
     Parameters:
-    - mask: numpy array, the mask array.
+    - mask_for_pca: numpy array, the mask array.
     - target_axis: str, the target axis for alignment ('X', 'Y', or 'Z').
     - rotation_plane: str, the rotation plane for alignment ('XY', 'XZ', or 'YZ').
     - temporal_slice: slice, the temporal slice to use for alignment.
@@ -40,16 +39,6 @@ def _compute_rotation_angle_and_indices(
     - rotation_plane_indices: tuple, the indices of the rotation plane.
 
     """
-
-    is_temporal = mask.ndim == 4
-    temporal_slice = slice(None) if temporal_slice is None else temporal_slice
-
-    # Compute the mask that will be used to compute the major axis.
-    # If the mask is a temporal array, the major axis is computed by aggregating the mask
-    # instances in temporal_slice.
-    mask_for_pca = (
-        np.any(mask[temporal_slice], axis=0) if is_temporal else mask
-    )
 
     # Perform PCA on the mask to determine the major axis
     pca = PCA(n_components=3)
