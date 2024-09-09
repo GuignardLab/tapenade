@@ -2,14 +2,13 @@ from scipy.ndimage import zoom
 import numpy as np
 
 
-def _change_arrays_pixelsize(
-    mask: np.ndarray = None,
-    image: np.ndarray = None,
-    labels: np.ndarray = None,
-    input_pixelsize: tuple[float, float, float] = (1, 1, 1),
-    output_pixelsize: tuple[float, float, float] = (1, 1, 1),
-    order: int = 1,
-):
+
+def _change_array_pixelsize(
+        array: np.ndarray,
+        input_pixelsize: tuple[float, float, float] = (1, 1, 1),
+        output_pixelsize: tuple[float, float, float] = (1, 1, 1),
+        order: int = 1
+    ):
     """
     Make the input array isotropic by resampling it to the target spacing.
 
@@ -27,24 +26,6 @@ def _change_arrays_pixelsize(
 
     reshape_factors = np.array(input_pixelsize) / np.array(output_pixelsize)
 
-    if mask is not None:
-        mask_isotropic = zoom(mask, reshape_factors, order=0)
-    if image is not None:
-        image_isotropic = zoom(image, reshape_factors, order=order)
-    if labels is not None:
-        labels_isotropic = zoom(labels, reshape_factors, order=0)
-
-    if mask is not None and image is not None and labels is not None:
-        return mask_isotropic, image_isotropic, labels_isotropic
-    elif mask is not None and image is not None:
-        return mask_isotropic, image_isotropic
-    elif mask is not None and labels is not None:
-        return mask_isotropic, labels_isotropic
-    elif image is not None and labels is not None:
-        return image_isotropic, labels_isotropic
-    elif mask is not None:
-        return mask_isotropic
-    elif image is not None:
-        return image_isotropic
-    elif labels is not None:
-        return labels_isotropic
+    array_isotropic = zoom(array, reshape_factors, order=order)
+    
+    return array_isotropic
