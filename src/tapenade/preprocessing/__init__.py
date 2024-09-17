@@ -1,6 +1,7 @@
 from ._preprocessing import (
     change_array_pixelsize,
     compute_mask,
+    transpose_and_split_stack,
     local_image_equalization,
     normalize_intensity,
     align_array_major_axis,
@@ -15,6 +16,7 @@ from ._preprocessing import (
 __all__ = [
     "change_array_pixelsize",
     "compute_mask",
+    "transpose_and_split_stack",
     "local_image_equalization",
     "normalize_intensity",
     "align_array_major_axis",
