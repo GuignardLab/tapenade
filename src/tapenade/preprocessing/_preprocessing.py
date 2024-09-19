@@ -758,7 +758,7 @@ def _parallel_gaussian_smooth(
     return _masked_smooth_gaussian(data, sigmas, mask, mask_for_volume)
 
 
-def masked_gaussian_smooth(
+def masked_gaussian_smoothing(
     image: np.ndarray,
     sigmas: Union[float, list[float]],
     mask: Optional[np.ndarray] = None,
