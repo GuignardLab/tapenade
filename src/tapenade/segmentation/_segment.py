@@ -1,9 +1,20 @@
+import warnings
+
 import numpy as np
 from tqdm import tqdm
 
-from tapenade.preprocessing import change_arrays_pixelsize, segment_stardist
-from skimage.transform import resize
+try:
+    from csbdeep.utils import normalize
+    from stardist.models import StarDist3D
+except ImportError:
+    warnings.warn(
+        "Please install the required packages: pip install stardist csbdeep"
+    )
 
+import os
+from pathlib import Path
+
+from tapenade.preprocessing import change_arrays_pixelsize
 
 
 def predict_stardist(
@@ -27,6 +38,9 @@ def predict_stardist(
     - aniso_labels: numpy array, predicted
     """
     assert len(np.shape(array)) <= 3
+    model_name = Path(model_path).stem
+    directory = str(os.path.split(model_path)[0])
+    model = StarDist3D(None, name=model_name, basedir=directory)
 
     data = change_arrays_pixelsize(
         image=array,
@@ -34,75 +48,19 @@ def predict_stardist(
         output_pixelsize=voxelsize_model,
         order=1,
     )
-
     if normalize_input:
-        perc_low, perc_high = np.percentile(data, (1, 99))
-        data = (data - perc_low) / (perc_high - perc_low)
-
-    labels = segment_stardist(data, model_path)
-
-    aniso_labels = resize(
-        labels,
-        array.shape,
-        anti_aliasing=False,
+        data = normalize(data, 1, 99)
+    labels, _ = model.predict_instances(
+        data, axes="ZYX", n_tiles=model._guess_n_tiles(data)
+    )
+    aniso_labels = change_arrays_pixelsize(
+        labels=labels,
+        input_pixelsize=voxelsize_model,
+        output_pixelsize=input_voxelsize,
         order=0,
-        preserve_range=True,
     )
 
-    return aniso_labels.astype(np.int16)
-
-
-# def predict_stardist(
-#     array: np.ndarray,
-#     model_path: str,
-#     input_voxelsize: tuple,
-#     voxelsize_model: tuple = (0.7, 0.7, 0.7),
-#     normalize_input: bool = True,
-# ):
-#     """
-#     Predict the segmentation of an array using a StarDist model.
-
-#     Parameters:
-#     - array: a 3D numpy array, input image to segment
-#     - model_path: str, path to the StarDist model
-#     - input_voxelsize: tuple, input voxel size of the image
-#     - voxelsize_model: tuple, voxel size of the model
-#     - normalize_input: bool, whether to normalize the input image
-
-#     Returns:
-#     - aniso_labels: numpy array, predicted
-#     """
-#     assert len(np.shape(array)) <= 3
-#     model_name = Path(model_path).stem
-#     directory = str(os.path.split(model_path)[0])
-#     model = StarDist3D(None, name=model_name, basedir=directory)
-
-#     data = change_arrays_pixelsize(
-#         image=array,
-#         input_pixelsize=input_voxelsize,
-#         output_pixelsize=voxelsize_model,
-#         order=1,
-#     )
-#     if normalize_input:
-#         data = normalize(data, 1, 99)
-#     labels, _ = model.predict_instances(
-#         data, axes="ZYX", n_tiles=model._guess_n_tiles(data)
-#     )
-#     # aniso_labels = change_arrays_pixelsize(
-#     #     labels=labels,
-#     #     input_pixelsize=voxelsize_model,
-#     #     output_pixelsize=input_voxelsize,
-#     #     order=0,
-#     # )
-#     aniso_labels = resize(
-#         labels,
-#         array.shape,
-#         anti_aliasing=False,
-#         order=0,
-#         preserve_range=True,
-#     )
-
-#     return np.asarray(aniso_labels).astype(np.int16)
+    return np.asarray(aniso_labels).astype(np.int16)
 
 
 def find_seg_errors(segmentation: np.ndarray, image: np.ndarray):
