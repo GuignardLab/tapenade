@@ -24,6 +24,7 @@ from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse
 )
+from tapenade.preprocessing._segmentation import _segment_stardist
 from tapenade.preprocessing._thresholding import _compute_mask
 
 """
@@ -203,7 +204,8 @@ def compute_mask(
     method: str,
     sigma_blur: float,
     threshold_factor: float = 1,
-    compute_convex_hull: bool = False,
+    post_processing_method: str = "fill_holes",
+    keep_largest_cc: bool = True,
     registered_image: bool = False,
     n_jobs: int = -1,
 ) -> np.ndarray:
@@ -217,8 +219,10 @@ def compute_mask(
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold (default: 1)
-    - compute_convex_hull: bool, set to True to compute the convex hull of the mask. If set to
-      False, a hole-filling operation will be performed instead.
+    - post_processing_method: str, method to use for post-processing the mask. Can be 'convex_hull' to compute
+      the convex hull of the mask, 'fill_holes' to fill holes in the mask, or 'none' to skip post-processing
+      (default: 'fill_holes')
+    - keep_largest_cc: bool, set to True to keep only the largest connected component in the mask (default: True)
     - n_jobs: int, number of parallel jobs to run (-1 for using all available CPUs)
 
     Returns:
@@ -233,7 +237,8 @@ def compute_mask(
             method=method,
             sigma_blur=sigma_blur,
             threshold_factor=threshold_factor,
-            compute_convex_hull=compute_convex_hull,
+            post_processing_method=post_processing_method,
+            keep_largest_cc=keep_largest_cc,
             registered_image=registered_image,
         )
 
@@ -263,11 +268,12 @@ def compute_mask(
         # Single image processing
         mask = _compute_mask(
             image,
-            method,
-            sigma_blur,
-            threshold_factor,
-            compute_convex_hull,
-            registered_image,
+            method=method,
+            sigma_blur=sigma_blur,
+            threshold_factor=threshold_factor,
+            post_processing_method=post_processing_method,
+            keep_largest_cc=keep_largest_cc,
+            registered_image=registered_image,
         )
 
     return mask
@@ -431,6 +437,50 @@ def normalize_intensity(
         )
     
     return np.array(normalized_array)
+
+
+def segment_stardist(
+    image: np.ndarray,
+    model_path: str,
+    thresholds_dict: dict = None,
+    n_jobs: int = -1,
+) -> np.ndarray:
+    
+    """
+    Predict the segmentation of an array using a StarDist model.
+
+    Parameters:
+    - image: a 3D numpy array, input image to segment
+    - model_path: str, path to the StarDist model folder
+    - thresholds_dict: dict, dictionary of thresholds for the model, structured like
+      {'prob': 0.5, 'nms': 0.3} for probability and non-maximum suppression thresholds
+      respectively (default: None)
+    - n_jobs: int, not used here but kept for consistency with other functions
+    """
+
+    is_temporal = image.ndim == 4
+
+    if is_temporal:
+        labels = np.array(
+            [
+                _segment_stardist(
+                    im,
+                    model_path=model_path,
+                    thresholds_dict=thresholds_dict,
+                )
+                for im in tqdm(image, desc="Predicting with StarDist")
+            ],
+            dtype=np.uint16
+        )
+
+    else:
+        labels = _segment_stardist(
+            image,
+            model_path=model_path,
+            thresholds_dict=thresholds_dict,
+        )
+
+    return labels
 
 
 def align_array_major_axis(
@@ -1108,3 +1158,4 @@ def masked_gaussian_smooth_sparse(
             sigmas=sigmas,
             dim_space=dim_space,
         )
+
