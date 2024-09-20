@@ -182,31 +182,26 @@ def _binary_fill_holes_on_each_slice(mask: np.ndarray) -> np.ndarray:
 
 
 def _refine_raw_mask(
-    mask: np.ndarray, post_processing_method: str, keep_largest_cc: bool
+    mask: np.ndarray, compute_convex_hull: bool
 ) -> np.ndarray:
     """
     Refine the raw mask by keeping only the largest connected component and filling holes.
 
     Parameters:
     - mask: numpy array, binary mask
-    - post_processing_method: str, method to use for post-processing the mask. Can be 'convex_hull' to compute
-      the convex hull of the mask, 'fill_holes' to fill holes in each 2D slice of the mask, or 'none' to skip
-    - keep_largest_cc: bool, set to True to keep only the largest connected component in the mask.
+    - compute_convex_hull: bool, set to True to compute the convex hull of the mask
 
     Returns:
     - refined_mask: numpy array, refined binary mask
     """
     # Keep only the largest connected component
-    if keep_largest_cc:
-        refined_mask = _get_largest_connected_component(mask)
+    refined_mask = _get_largest_connected_component(mask)
     # Fill holes in the mask
-    if post_processing_method == "convex_hull":
+    if compute_convex_hull:
         refined_mask = _compute_mask_convex_hull(refined_mask, 3)
-    elif post_processing_method == "fill_holes":
+    else:
         refined_mask = binary_fill_holes(refined_mask)
         refined_mask = _binary_fill_holes_on_each_slice(refined_mask)
-    else:
-        pass
 
     return refined_mask
 
@@ -219,9 +214,7 @@ def _compute_mask(
     method: str,
     sigma_blur: float,
     threshold_factor: float = 1,
-    # compute_convex_hull: bool = False,
-    keep_largest_cc: bool = True,
-    post_processing_method: str = "fill_holes",
+    compute_convex_hull: bool = False,
     registered_image: bool = False,
 ) -> np.ndarray:
     """
@@ -234,9 +227,8 @@ def _compute_mask(
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold
-    - keep_largest_cc: bool, set to True to keep only the largest connected component in the mask.
-    - post_processing_method: str, method to use for post-processing the mask. Can be 'convex_hull' to compute
-      the convex hull of the mask, 'fill_holes' to fill holes in each 2D slice of the mask, or 'none' to skip
+    - compute_convex_hull: bool, set to True to compute the convex hull of the mask. If set to
+      False, a hole-filling operation will be performed instead.
     - registered_image: bool, set to True if the image has been registered beforehand and thus
       contains large regions of zeros that lead to sharp intensity gradients at the boundaries.
 
@@ -262,7 +254,6 @@ def _compute_mask(
         raise ValueError(f"Unknown thresholding method: {method}")
 
     # Refine the mask by keeping only the largest connected component and filling holes
-    if keep_largest_cc or post_processing_method != "none":
-        mask = _refine_raw_mask(mask, post_processing_method, keep_largest_cc)
+    mask = _refine_raw_mask(mask, compute_convex_hull)
 
     return mask
