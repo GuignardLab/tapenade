@@ -24,7 +24,10 @@ from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse
 )
-from tapenade.preprocessing._segmentation import _segment_stardist
+from tapenade.preprocessing._segmentation import (
+    _segment_stardist,
+    _load_model
+)
 from tapenade.preprocessing._thresholding import _compute_mask
 
 """
@@ -460,12 +463,14 @@ def segment_stardist(
 
     is_temporal = image.ndim == 4
 
+    model = _load_model(model_path)
+
     if is_temporal:
         labels = np.array(
             [
                 _segment_stardist(
                     im,
-                    model_path=model_path,
+                    model=model,
                     thresholds_dict=thresholds_dict,
                 )
                 for im in tqdm(image, desc="Predicting with StarDist")
@@ -476,11 +481,33 @@ def segment_stardist(
     else:
         labels = _segment_stardist(
             image,
-            model_path=model_path,
+            model=model,
             thresholds_dict=thresholds_dict,
         )
 
     return labels
+
+def segment_stardist_from_files(
+    image_files: list[str],
+    path_to_save: str,
+    compress_params: dict,
+    func_params: dict,
+):
+
+    model = _load_model(func_params["model_path"])    
+
+    for file in image_files:
+        image = tifffile.imread(file)
+        labels = _segment_stardist(
+            image,
+            model=model,
+            thresholds_dict=func_params.get("thresholds_dict", None),
+        )
+        tifffile.imwrite(
+            f"{path_to_save}/segmented_{file}",
+            labels,
+            **compress_params
+        )
 
 
 def align_array_major_axis(
