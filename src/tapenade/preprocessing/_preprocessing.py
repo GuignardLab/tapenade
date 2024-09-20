@@ -79,7 +79,7 @@ def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:in
         )
         for ch in liste_channels:
             channel = image[:, ch, :, :]
-            (mask_iso, channel_iso, seg_iso) = change_arrays_pixelsize(
+            (mask_iso, channel_iso, seg_iso) = change_array_pixelsize(
                 mask=mask,
                 image=channel,
                 labels=labels,
