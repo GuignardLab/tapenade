@@ -102,17 +102,17 @@ def prop_principal_lengths(
         regionprops_prop = add_tensor_inertia(regionprops_prop, scale)
 
     tensor = regionprops_prop.tensor_inertia
-    print('ti',tensor)
+    print("ti", tensor)
     rescaled_tensor = tensor * 5 / regionprops_prop.area
-    print('tir',rescaled_tensor)
+    print("tir", rescaled_tensor)
 
     axis_decoupling_matrix = np.ones((3, 3)) / 2 - np.eye(3)
 
     if return_principal_vectors:
         eigen_values, principal_vectors = np.linalg.eigh(rescaled_tensor)
-        print('ev',eigen_values)
+        print("ev", eigen_values)
         principal_lengths = np.sqrt(axis_decoupling_matrix @ eigen_values)
-        print('pl',principal_lengths)
+        print("pl", principal_lengths)
         return principal_lengths, principal_vectors.T
     else:
         eigen_values = np.linalg.eigvalsh(rescaled_tensor)

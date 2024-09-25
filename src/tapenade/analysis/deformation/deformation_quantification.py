@@ -1,13 +1,12 @@
 import numpy as np
 
 
-
 def tensors_to_napari_vectors(
-        sparse_tensors: np.ndarray, 
-        is_inertia_tensor: bool, 
-        volumes: np.ndarray = None, 
-        return_angles: bool = False
-    ):
+    sparse_tensors: np.ndarray,
+    is_inertia_tensor: bool,
+    volumes: np.ndarray = None,
+    return_angles: bool = False,
+):
     """
     Extracts the largest eigenvalue and eigenvector from a set of sparse tensors.
     Returns the product of the eigenvalues and eigenvectors as a set of vector
@@ -49,28 +48,29 @@ def tensors_to_napari_vectors(
 
     if is_inertia_tensor:
         # the principal lengths are a mix of the eigenvalues and the volumes
-        axis_decoupling_matrix = np.ones((3,3))/2 - np.eye(3)
+        axis_decoupling_matrix = np.ones((3, 3)) / 2 - np.eye(3)
         eigen_values = np.sqrt(
-            np.einsum('ij,lj->li', axis_decoupling_matrix, eigen_values)
+            np.einsum("ij,lj->li", axis_decoupling_matrix, eigen_values)
         )
         eigen_values = eigen_values * np.sqrt(5 / volumes.reshape(-1, 1, 1))
-    
+
     # WARNING: the scipy documentation is wrong, the eigenvectors are in the columns
     # not the lines, i.e principal_vectors[:,:,0] is the 0th principal vector
-    principal_vectors = principal_vectors.transpose(0,2,1)
+    principal_vectors = principal_vectors.transpose(0, 2, 1)
 
     napari_vectors = np.zeros((len(positions), 2, 3))
     indices_maxs = np.nanargmax(eigen_values, axis=1)
-    principal_vectors = principal_vectors[np.arange(len(eigen_values)), indices_maxs]
+    principal_vectors = principal_vectors[
+        np.arange(len(eigen_values)), indices_maxs
+    ]
     eigen_values = eigen_values[np.arange(len(eigen_values)), indices_maxs]
-    napari_vectors[:,0] = positions
-    napari_vectors[:,1] = principal_vectors * eigen_values.reshape(-1,1)
+    napari_vectors[:, 0] = positions
+    napari_vectors[:, 1] = principal_vectors * eigen_values.reshape(-1, 1)
 
     if return_angles:
-        angles = np.arctan2(*(napari_vectors[:,1, -2:].reshape(-1, 2).T))
+        angles = np.arctan2(*(napari_vectors[:, 1, -2:].reshape(-1, 2).T))
         angles = np.arctan2(np.sin(angles), np.cos(angles))
 
         return napari_vectors, angles
-
 
     return napari_vectors

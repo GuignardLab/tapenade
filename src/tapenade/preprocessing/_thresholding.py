@@ -33,7 +33,9 @@ def _snp_threshold_binarization(
     if registered_image:
         nonzero_mask = image > 0
 
-        blurred = _masked_smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
+        blurred = _masked_smooth_gaussian(
+            image, mask=nonzero_mask, sigmas=sigma_blur
+        )
 
         blurred2 = _masked_smooth_gaussian(
             image**2, mask=nonzero_mask, sigmas=sigma_blur

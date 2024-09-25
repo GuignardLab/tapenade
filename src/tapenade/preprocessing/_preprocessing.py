@@ -22,7 +22,7 @@ from tapenade.preprocessing._intensity_normalization import (
 from tapenade.preprocessing._local_equalization import _local_equalization
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
-    _masked_smooth_gaussian_sparse
+    _masked_smooth_gaussian_sparse,
 )
 from tapenade.preprocessing._thresholding import _compute_mask
 
@@ -45,7 +45,9 @@ In typical order:
 """
 
 
-def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:int=0) :
+def isotropize_and_normalize(
+    mask, image, labels, scale, sigma: float = None, pos_ref: int = 0
+):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
     Parameters
@@ -158,7 +160,9 @@ def change_array_pixelsize(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_array = [
-                _change_array_pixelsize(arr, input_pixelsize, output_pixelsize, order=order)
+                _change_array_pixelsize(
+                    arr, input_pixelsize, output_pixelsize, order=order
+                )
                 for arr in tqdm(
                     array,
                     desc="Making array isotropic",
@@ -190,13 +194,14 @@ def change_array_pixelsize(
     else:
         # Resizing the whole image
         resized_array = _change_array_pixelsize(
-            array, 
+            array,
             input_pixelsize=input_pixelsize,
             output_pixelsize=output_pixelsize,
             order=order,
         )
 
     return resized_array
+
 
 def compute_mask(
     image: np.ndarray,
@@ -429,7 +434,7 @@ def normalize_intensity(
             labels=labels,
             width=width,
         )
-    
+
     return np.array(normalized_array)
 
 
@@ -542,21 +547,28 @@ def _load_array_rotate_and_save_to_file(
     array = tifffile.imread(array_file)
     mask = tifffile.imread(mask_file)
     array_rotated = rotate(
-        array, angle=rotation_angle, axes=rotation_plane_indices, reshape=True, order=order
+        array,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=order,
     )
     mask_rotated = rotate(
-        mask, angle=rotation_angle, axes=rotation_plane_indices, 
-        reshape=True, order=0
+        mask,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=0,
     )
     array_rotated = np.where(mask_rotated, array_rotated, 0)
     if order > 1:
         # preserve the original intensity range
         array_rotated = np.clip(array_rotated, array.min(), array.max())
-        
+
     tifffile.imwrite(
         f"{path_to_save}/aligned_{index:>04}.tif",
         array_rotated,
-        **compress_params
+        **compress_params,
     )
 
 
@@ -565,7 +577,7 @@ def align_array_major_axis_from_files(
     array_files: list[str],
     path_to_save: str,
     compress_params: dict,
-    func_params: dict, 
+    func_params: dict,
 ):
     """
     Aligns the major axis of an array to a target axis in a specified rotation plane.
@@ -604,12 +616,18 @@ def align_array_major_axis_from_files(
 
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        res = list(tqdm(
-            executor.map(multithreaded_function, array_files, mask_files, range(len(array_files))),
-            total=len(array_files),
-            desc="Aligning array",
-        ))
-    
+        res = list(
+            tqdm(
+                executor.map(
+                    multithreaded_function,
+                    array_files,
+                    mask_files,
+                    range(len(array_files)),
+                ),
+                total=len(array_files),
+                desc="Aligning array",
+            )
+        )
 
 
 def crop_array_using_mask(
@@ -680,9 +698,7 @@ def _load_array_crop_and_save_to_file(
 ):
     array = tifffile.imread(array_file)[mask_slice]
     tifffile.imwrite(
-        f"{path_to_save}/cropped_{index:>04}.tif",
-        array,
-        **compress_params
+        f"{path_to_save}/cropped_{index:>04}.tif", array, **compress_params
     )
 
 
@@ -743,11 +759,17 @@ def crop_array_using_mask_from_files(
     )
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        res = list(tqdm(
-            executor.map(multithreaded_function, array_files, range(len(array_files))),
-            total=len(array_files),
-            desc="Cropping array",
-        ))
+        res = list(
+            tqdm(
+                executor.map(
+                    multithreaded_function,
+                    array_files,
+                    range(len(array_files)),
+                ),
+                total=len(array_files),
+                desc="Cropping array",
+            )
+        )
 
 
 def _parallel_gaussian_smooth(
@@ -1000,9 +1022,9 @@ def masked_gaussian_smooth_sparse(
     Parameters
     ----------
     sparse_array : np.ndarray or list of np.ndarray
-        Array of points to smooth in format (n_points, n_dim_space + n_dim_points). 
-        The first columns (up to dim_space, i.e [:dim_space]) must be the spatial coordinates. 
-        The remaining columns are the values/vectors to smooth. A temporal sparse array is a 
+        Array of points to smooth in format (n_points, n_dim_space + n_dim_points).
+        The first columns (up to dim_space, i.e [:dim_space]) must be the spatial coordinates.
+        The remaining columns are the values/vectors to smooth. A temporal sparse array is a
         list of sparse arrays, one for each time point.
     is_temporal : bool
         If True, the array is temporal and the smoothing is applied to each time step.
