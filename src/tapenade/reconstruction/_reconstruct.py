@@ -140,6 +140,9 @@ def create_folders(
         os.mkdir(os.path.join(folder_sample, "raw"))
         os.mkdir(os.path.join(folder_sample, "registered"))
         os.mkdir(os.path.join(folder_sample, "fused"))
+        os.mkdir(os.path.join(folder_sample, "weights"))
+        os.mkdir(os.path.join(Path(folder_sample) / "weights","before_trsf"))
+        os.mkdir(os.path.join(Path(folder_sample) / "weights","after_trsf"))
 
         image_ref = io.imread(
             Path(folder_experiment) / f"{filename_ref}.tif"
@@ -323,7 +326,7 @@ def list_init_trsf(trans1,trans2,rot):
         ]
     return(init_trsf)
 
-def compute_transformation_from_trsf_files(path_trsf:str):
+def compute_transformation_from_trsf_files(path_trsf:str,return_matrix:bool=False):
         
     f = open(Path(path_trsf) / "A1-rigid.trsf", 'r')
 
@@ -343,8 +346,12 @@ def compute_transformation_from_trsf_files(path_trsf:str):
         
     scale, shear, angles, trans, persp = tg.decompose_matrix(matrix)
     angles_deg=[math.degrees(angles[0]), math.degrees(angles[1]), math.degrees(angles[2])]
-    print("rotation angles (X,Y,Z) in deg:",angles_deg)
-    print("translation vector:",trans)
+    #rotation angles (X,Y,Z) in deg:",angles_deg
+    if return_matrix==True:
+        return(matrix)
+    else :
+        return(trans,angles_deg)
+
 def register(
     path_data: str,
     path_transformation: str,
@@ -558,7 +565,7 @@ def sigmoid(z, z0, p):
     """
     return 1 / (1 + np.exp(-p * (z - z0)))
 
-def fuse_sides(
+def fuse_sides_in_z_axis(
     path_registered_data: str,
     reference_image_reg: str,
     floating_image_reg: str,
@@ -567,7 +574,7 @@ def fuse_sides(
     slope_coeff: int = 20,
     axis: int = 0,
     return_image=False
-):
+):#outdated version, fuses the views along z axis instead of along the sample axis (can be different if the sample moved between the 2 views)
     """
     Fuse the two sides of the sample, using the previously registered images
 
@@ -614,7 +621,111 @@ def fuse_sides(
     w2 = sigmoid(cumsum_normalized, z0=0.5, p=slope_coeff)
     w1 = 1 - w2
 
-    fusion = (ref_image * w1 + float_image * w2)
+    sum_weights = w1 + w2
+
+    fusion = (ref_image * w1/sum_weights + float_image * w2/sum_weights)
+
+    if return_image:
+        return fusion
+    io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
+
+def fuse_sides(
+    folder: str,
+    reference_image: str,
+    floating_image: str,
+    folder_output: str = "",
+    name_output: str = "fusion",
+    slope_coeff: int = 20,
+    axis: int = 0,
+    input_voxel: list = [1, 1, 1],
+    output_voxel: list = [1, 1, 1],
+    trsf_type: str = "rigid",
+    return_image=False
+):
+    """
+    Fuse the two sides of the sample, using the previously registered images. Compute sigmoid weights from raw images, then register the weights using the transformation computed on the intensity image and then fuse the images using the registered weights.
+
+    Parameters
+    ----------
+    folder : str
+        path to the main folder
+    reference_image : str
+        name of the reference image, the 'fixed' one
+    floating_image : str
+        name of the floating image, the one that will be registered onto the reference image
+    folder_output : str
+        path to the folder where the fused image will be saved
+    name_output : str, optional
+        name of the output which is the fused image , by default 'fusion'
+    slope_coeff : int, optional
+        coefficient to apply to the sigmoid function, by default 20. 5 corresponds to a low slope, wide fusion width and 25 to a strong slope, very thin fusion width
+    axis : int, optional
+        axis along which the fusion is done, by default 0 (z axis)
+    input_voxel : list, optional
+        voxel size of the input image, by default [1,1,1]. Has to be the same as the intensity images.
+    output_voxel : list, optional   
+        voxel size of the output image, by default [1,1,1].  Has to be the same as the intensity images.
+    trsf_type : str, optional
+        type of transformation to compute : rigid, affine. By default rigid. Has to be the same as the intensity images.
+    return_image : bool, optional
+        if True, returns the fused image, by default False
+    """
+    
+    if isinstance(reference_image, (str | Path)):
+
+        ref_im = io.imread(
+            Path(folder) / "raw" / reference_image)
+        float_im = io.imread(
+            Path(folder) / "raw" / floating_image
+        )
+    dtype_input=float_im.dtype #we wil return an image that has the same dtype as the input image
+    mask_r = ref_im > 0
+    mask_f = float_im > 0
+
+    #we compute the weights as a sigmoid function of the distance to the objective (=cumulative sum of the raw image)
+    cumsum_r = np.cumsum(mask_r, axis=axis)
+    cumsum_r_normalized = cumsum_r / np.max(cumsum_r)
+    w_ref= sigmoid(1-cumsum_r_normalized, z0=0.5, p=slope_coeff)
+    w_ref[np.invert(mask_r)] = 0
+
+    cumsum_f = np.cumsum(mask_f, axis=axis)
+    cumsum_f_normalized = cumsum_f / np.max(cumsum_f)
+    w_float = sigmoid(1-cumsum_f_normalized, z0=0.5, p=slope_coeff)
+    w_float[np.invert(mask_f)] = 0
+
+    folder_weight = Path(folder) / "weights"
+
+    #saving weights (from the original images) is necessary to apply transformation
+    io.imsave(
+    Path(folder_weight) / "before_trsf" / f"w_float.tif",w_float.astype(np.float32)
+    )
+    io.imsave(
+    Path(folder_weight) /  "before_trsf" / f"w_ref.tif",w_ref.astype(np.float32)
+    )
+    register(
+        path_data=Path(folder_weight) / "before_trsf",
+        path_transformation =Path(folder) / "trsf",
+        path_registered_data=Path(folder_weight) / "after_trsf",
+        reference_image=f"w_ref.tif",
+        floating_image=f"w_float.tif",
+        input_voxel=input_voxel,
+        output_voxel=output_voxel,
+        compute_trsf=0, #we apply the same trsf that was computed for the actual intensity images
+        test_init=0,
+        trsf_type=trsf_type
+    )
+
+    w_ref_after_trsf = io.imread(Path(folder_weight) / "after_trsf"/ "w_ref.tif") #need to register the reference image as well because of possible changes in voxel size
+    w_float_after_trsf = io.imread(Path(folder_weight) / "after_trsf"/ "w_float.tif")
+
+    ref_im_registered = io.imread(
+        Path(folder) / "registered" / reference_image)
+    float_im_registered = io.imread(
+        Path(folder) / "registered" / floating_image
+    )
+    sum_weights  = w_ref_after_trsf + w_float_after_trsf
+    #we sum the registered images applying the registered weights
+    fusion = (ref_im_registered * w_ref_after_trsf/sum_weights + float_im_registered * w_float_after_trsf/sum_weights)
 
     if return_image:
         return fusion
