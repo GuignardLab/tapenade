@@ -14,7 +14,7 @@ except ImportError:
 import os
 from pathlib import Path
 
-from tapenade.preprocessing import change_arrays_pixelsize
+from tapenade.preprocessing import change_array_pixelsize
 
 
 def predict_stardist(
@@ -42,7 +42,7 @@ def predict_stardist(
     directory = str(os.path.split(model_path)[0])
     model = StarDist3D(None, name=model_name, basedir=directory)
 
-    data = change_arrays_pixelsize(
+    data = change_array_pixelsize(
         image=array,
         input_pixelsize=input_voxelsize,
         output_pixelsize=voxelsize_model,
