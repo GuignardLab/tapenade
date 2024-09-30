@@ -43,7 +43,7 @@ def predict_stardist(
     model = StarDist3D(None, name=model_name, basedir=directory)
 
     data = change_array_pixelsize(
-        image=array,
+        array=array,
         input_pixelsize=input_voxelsize,
         output_pixelsize=voxelsize_model,
         order=1,
@@ -53,8 +53,8 @@ def predict_stardist(
     labels, _ = model.predict_instances(
         data, axes="ZYX", n_tiles=model._guess_n_tiles(data)
     )
-    aniso_labels = change_arrays_pixelsize(
-        labels=labels,
+    aniso_labels = change_array_pixelsize(
+        array=labels,
         input_pixelsize=voxelsize_model,
         output_pixelsize=input_voxelsize,
         order=0,
