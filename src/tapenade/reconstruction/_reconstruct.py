@@ -714,12 +714,11 @@ def fuse_sides(
     cumsum_r = np.cumsum(mask_r, axis=axis)
     cumsum_r_normalized = cumsum_r / np.max(cumsum_r)
     w_ref = sigmoid(1 - cumsum_r_normalized, z0=0.5, p=slope_coeff)
-    w_ref[np.invert(mask_r)] = 0
+    # w_ref[np.invert(mask_r)] = 0
 
     cumsum_f = np.cumsum(mask_f, axis=axis)
     cumsum_f_normalized = cumsum_f / np.max(cumsum_f)
     w_float = sigmoid(1 - cumsum_f_normalized, z0=0.5, p=slope_coeff)
-    w_float[np.invert(mask_f)] = 0
 
     folder_weight = Path(folder) / "weights"
 
@@ -764,7 +763,7 @@ def fuse_sides(
         ref_im_registered * w_ref_after_trsf / sum_weights
         + float_im_registered * w_float_after_trsf / sum_weights
     )
-
+    fusion[np.isnan(fusion)] = 0
     if return_image:
         return fusion
     io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
