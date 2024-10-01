@@ -1,16 +1,16 @@
 import warnings
+
 import numpy as np
 
 try:
-    from stardist.models import StarDist3D
     from stardist import gputools_available
+    from stardist.models import StarDist3D
 except ImportError:
-    warnings.warn(
-        "Please install Stardist for your system"
-    )
+    warnings.warn("Please install Stardist for your system")
 
 import os
 from pathlib import Path
+
 
 def _load_model(model_path: str):
     """
@@ -26,11 +26,8 @@ def _load_model(model_path: str):
 
     return model
 
-def _segment_stardist(
-    image: np.ndarray,
-    model,
-    thresholds_dict: dict
-):
+
+def _segment_stardist(image: np.ndarray, model, thresholds_dict: dict):
     """
     Predict the segmentation of an array using a StarDist model.
 

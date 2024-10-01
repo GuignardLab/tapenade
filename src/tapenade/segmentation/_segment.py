@@ -1,9 +1,8 @@
 import numpy as np
+from skimage.transform import resize
 from tqdm import tqdm
 
 from tapenade.preprocessing import change_arrays_pixelsize, segment_stardist
-from skimage.transform import resize
-
 
 
 def predict_stardist(
