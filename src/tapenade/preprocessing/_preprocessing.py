@@ -9,7 +9,7 @@ from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
-
+from ensure import check
 from tapenade.preprocessing._array_rescaling import _change_array_pixelsize
 from tapenade.preprocessing._local_equalization import _local_equalization
 from tapenade.preprocessing._thresholding import _compute_mask
@@ -198,24 +198,25 @@ def change_array_pixelsize(
 
     return resized_array
 
-def transpose_and_split_stack(
-    image:np.ndarray,
-    nb_channels:int,
-    nb_depth:int,
-    nb_Y:int,
-    nb_X:int,
-    nb_timepoints:int,
-    bool_seperate_channels:bool
+def reorganize_array_dimension(
+    array:np.ndarray,
+    nb_channels:int=None,
+    nb_depth:int=None,
+    nb_Y:int=None,
+    nb_X:int=None,
+    nb_timepoints:int=None,
+    bool_seperate_channels:bool=False,
+    shape_as_string:str='',
     ) -> list :
 
     """
     Take a stack that can be 3D, 4D (TZYX or CZYX) or 5D (CTZYX)  and re-organize it in CTZYX convention.
-    Possibility to split the channels if it is a multichannel image, in order to apply the pipeline functions on the separated channels.
+    Possibility to split the channels if it is a multichannel array, in order to apply the pipeline functions on the separated channels.
     In that case the output is a list of the different channels
     Parameters
     ----------
-    image : np.array
-        image to transpose and split
+    array : np.array
+        array to transpose and split
     nb_channels : int
         number of channels
     nb_depth : int
@@ -228,52 +229,145 @@ def transpose_and_split_stack(
         number of timepoints if this is a time sequence
     bool_seperate_channels : bool
         if True, the channels will be split
-
+    shape_as_string : str
+        To run as batch, possility to give direclty the order of the dimensions as a string. For example 'CTZYX' or 'XYZ'. The letters have to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed. Every letter can be included only once.
+        If this is not 'None', the parameters nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints are not taken into account.
     Returns
     -------
     output_list : list
-        list of images in CTZYX convention
+        list of arrays in CTZYX convention
 
     """
-    output_list=[] #output is a list of images
-    shape = np.shape(image)  
-    str_shape = np.array([str(i) for i in np.shape(image)])
-    #to find the index of each dimension we compare the shape of the image with the number selected. This is done comparing string.
-    ind_Z = np.argwhere(str_shape==str(nb_depth))[0][0] 
-    ind_Y = np.argwhere(str_shape==str(nb_Y))[0][0]
-    ind_X = np.argwhere(str_shape==str(nb_X))[0][0]
+    output_list=[] #output is a list of arrays
     
-    if nb_timepoints !='1' :
-        ind_T = np.argwhere(str_shape==str(nb_timepoints))[0][0]
-        size_T = shape[ind_T]
-    else :
-        size_T = 1 #if not a timesequence
+    if shape_as_string != 'None' :
+        check(len(shape_as_string)).equals(array.ndim).or_raise(
+            Exception,
+            "The number of dimensions is incorrect. \n",
+        )
 
-    if nb_channels !='1' :
-        ind_C = np.argwhere(str_shape==str(nb_channels))[0][0]
-        size_C = shape[ind_C]
-    else :
-        size_C = 1 #if only one channel
+        sorted_axes = str("".join(sorted(shape_as_string)))
+        # check(sorted_axes).contains('X').or_raise(
+        #     Exception,
+        #     'You need to have the letter X included in the shape string. \n',
+        # )
+        # check(sorted_axes).contains('Y').or_raise(
+        #     Exception,
+        #     'You need to have the letter Y included in the shape string. \n',
+        # )
+        check(['CTXYZ','CXYZ','TXYZ','XYZ','XY']).contains(sorted_axes).or_raise(
+            Exception,
+            'The letters you choose has to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed. Every letter can be included only once.',
+        )
+        ind_X = shape_as_string.find('X')
+        ind_Y = shape_as_string.find('Y')
 
-    #convention CTZYX
-    if size_T > 1 and size_C > 1:
-        image_transposed = np.transpose(image, (ind_C, ind_T, ind_Z,ind_Y,ind_X))
-        if bool_seperate_channels :
-            for c in range(size_C) :
-                output_list.append(image_transposed[c,:,:,:,:])
-        else : #if we don't want to split the channels, then the output list has only one element that is the multichannel image
-            output_list.append(image_transposed)
-    elif size_T > 1 and size_C == 1: #TZYX
-        output_list.append(np.transpose(image, (ind_T, ind_Z,ind_Y,ind_X)))
-    elif size_T==1 and size_C>1: #CZYX
-        image_transposed = np.transpose(image, (ind_C, ind_Z,ind_Y,ind_X))
-        if bool_seperate_channels :
-            for c in range(size_C) :
-                output_list.append(image_transposed[c,:,:,:])
-        else : #if we don't want to split the channels, then the output list has only one element that is the multichannel image
-            output_list.append(image_transposed)
-    else : # 3D data
-        output_list.append(np.transpose(image, (ind_Z,ind_Y,ind_X)))
+        if "".join(sorted_axes) == "CTXYZ":
+            size_C = array.shape[shape_as_string.find("C")]
+            size_T= array.shape[shape_as_string.find("T")]
+            size_Z = array.shape[shape_as_string.find("Z")]
+            ind_C = shape_as_string.find("C")
+            ind_T = shape_as_string.find("T")
+            ind_Z = shape_as_string.find("Z")
+        elif "".join(sorted_axes) == "CXYZ":
+            size_C = array.shape[shape_as_string.find("C")]
+            size_T = 1
+            size_Z = array.shape[shape_as_string.find("Z")]
+            ind_C = shape_as_string.find("C")
+            ind_Z = shape_as_string.find("Z")
+        elif "".join(sorted_axes) == "TXYZ":
+            size_C = 1
+            size_T = array.shape[shape_as_string.find("T")]
+            size_Z = array.shape[shape_as_string.find("Z")]
+            ind_T = shape_as_string.find("T")
+            ind_Z = shape_as_string.find("Z")
+        elif "".join(sorted_axes) == "XYZ":
+            size_Z = array.shape[shape_as_string.find("Z")]
+            size_T = 1
+            size_C = 1
+            ind_Z = shape_as_string.find("Z")
+        elif "".join(sorted_axes) == "XY":
+            size_C = 1
+            size_T = 1
+            size_Z = 1
+
+    else : #if the shape is not given in the parameter shape_as_string, then we have to find the index of each dimension
+        shape = np.shape(array)  
+        str_shape =([str(i) for i in np.shape(array)])
+        for elem in str_shape : #we add a suffix to the elements that are present more than once, to make sure we recover individually the index of each dimension (str.index() returns the first occurence)
+            if str_shape.count(elem) > 1 :
+                for indice,value in enumerate([i for i, j in enumerate(str_shape) if j == elem]) :
+                    str_shape[value] = str_shape[value] + '_occurence' + str(indice+1)
+
+        list_selected_dimensions = [nb_channels,nb_depth,nb_Y,nb_X,nb_timepoints]
+        for elem in list_selected_dimensions : #we add a suffix to the elements that are present more than once, to make sure we recover individually the index of each dimension (str.index() returns the first occurence)
+            if list_selected_dimensions.count(elem) > 1 :
+                for indice,value in enumerate([i for i, j in enumerate(list_selected_dimensions) if j == elem]) :
+                    list_selected_dimensions[value] = list_selected_dimensions[value] + '_occurence' + str(indice+1)
+        (nb_channels,nb_depth,nb_Y,nb_X,nb_timepoints) = list_selected_dimensions
+        
+        #to find the index of each dimension we compare the shape of the array with the number selected. This is done comparing string.
+        ind_Y =str_shape.index(str(nb_Y))
+        ind_X =str_shape.index(str(nb_X))
+
+        if nb_timepoints !='None' :
+            ind_T=str_shape.index(str(nb_timepoints))
+            size_T = shape[ind_T]
+        else :
+            size_T = 1 #if not a timesequence
+
+        if nb_channels !='None' :
+            ind_C=str_shape.index(str(nb_channels))
+            size_C = shape[ind_C]
+        else :
+            size_C = 1 #if only one channel
+
+        if nb_depth !='None' :
+            ind_Z = str_shape.index(str(nb_depth))
+            size_Z = shape[ind_Z]
+            
+
+    #for each possibility, we transpose the array in the convention CTZYX and split it into channels if bool_seperate_channels is True
+    if size_Z >1 : #3D
+        if size_T > 1 and size_C > 1 :
+            array_transposed = np.transpose(array, (ind_C, ind_T, ind_Z,ind_Y,ind_X))
+            if bool_seperate_channels :
+                for c in range(size_C) :
+                    output_list.append(array_transposed[c,:,:,:,:])
+            else : #if we don't want to split the channels, then the output list has only one element that is the multichannel array
+                output_list.append(array_transposed)
+        elif size_T > 1 and size_C == 1: #TZYX
+            output_list.append(np.transpose(array, (ind_T, ind_Z,ind_Y,ind_X)))
+        elif size_T==1 and size_C>1: #CZYX
+            array_transposed = np.transpose(array, (ind_C, ind_Z,ind_Y,ind_X))
+            if bool_seperate_channels :
+                for c in range(size_C) :
+                    output_list.append(array_transposed[c,:,:,:])
+            else : #if we don't want to split the channels, then the output list has only one element that is the multichannel array. The value of the checkbox is not tkn into account if size_C=1
+                output_list.append(array_transposed)
+        else : # 3D data no channel no timepoint
+            output_list.append(np.transpose(array, (ind_Z,ind_Y,ind_X)))
+
+    elif size_Z == 1 : #2D data
+        if size_T > 1 and size_C > 1 :
+            array_transposed = np.transpose(array, (ind_C, ind_T,ind_Y,ind_X))
+            if bool_seperate_channels :
+                for c in range(size_C) :
+                    output_list.append(array_transposed[c,:,:,:])
+            else : #if we don't want to split the channels, then the output list has only one element that is the multichannel array
+                output_list.append(array_transposed)
+        elif size_T > 1 and size_C == 1: #TZYX
+            output_list.append(np.transpose(array, (ind_T,ind_Y,ind_X)))
+        elif size_T==1 and size_C>1: #CZYX
+            array_transposed = np.transpose(array, (ind_C,ind_Y,ind_X))
+            if bool_seperate_channels :
+                for c in range(size_C) :
+                    output_list.append(array_transposed[c,:,:])
+            else : #if we don't want to split the channels, then the output list has only one element that is the multichannel array. The value of the checkbox is not tkn into account if size_C=1
+                output_list.append(array_transposed)
+        else : # 2D data no channel no timepoint
+            output_list.append(array)
+
 
     return output_list
 
