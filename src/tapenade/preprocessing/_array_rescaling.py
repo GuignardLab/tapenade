@@ -1,14 +1,13 @@
-from scipy.ndimage import zoom
 import numpy as np
-
+from scipy.ndimage import zoom
 
 
 def _change_array_pixelsize(
-        array: np.ndarray,
-        input_pixelsize: tuple[float, float, float] = (1, 1, 1),
-        output_pixelsize: tuple[float, float, float] = (1, 1, 1),
-        order: int = 1
-    ):
+    array: np.ndarray,
+    input_pixelsize: tuple[float, float, float] = (1, 1, 1),
+    output_pixelsize: tuple[float, float, float] = (1, 1, 1),
+    order: int = 1,
+):
     """
     Make the input array isotropic by resampling it to the target spacing.
 
@@ -27,5 +26,5 @@ def _change_array_pixelsize(
     reshape_factors = np.array(input_pixelsize) / np.array(output_pixelsize)
 
     array_isotropic = zoom(array, reshape_factors, order=order)
-    
+
     return array_isotropic

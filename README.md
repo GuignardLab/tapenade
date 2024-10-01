@@ -1,4 +1,4 @@
-# :herb: Tapenade : Thorough Analysis PiEliNe for Advanced DEep imaging
+# :herb: Tapenade : Thorough Analysis PipEliNe for Advanced DEep imaging
 
 [![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/tapenade/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/tapenade)

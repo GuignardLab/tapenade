@@ -6,8 +6,12 @@ from scipy.ndimage import gaussian_filter as scipy_gaussian
 from scipy.spatial import KDTree
 
 
-def _masked_smooth_gaussian(array: np.ndarray, sigmas: Union[float, tuple], 
-                            mask: np.ndarray = None, mask_for_volume: np.ndarray = None):
+def _masked_smooth_gaussian(
+    array: np.ndarray,
+    sigmas: Union[float, tuple],
+    mask: np.ndarray = None,
+    mask_for_volume: np.ndarray = None,
+):
     """
     If 'mask' is specified, the convolution will not take the
     masked value into account.
@@ -96,11 +100,11 @@ def _loop_numba(cols, values, dists, n_points, dim_points):
 
 
 def _masked_smooth_gaussian_sparse(
-        sparse_array: np.ndarray, 
-        positions: np.ndarray, 
-        sigmas: Union[float, tuple],
-        dim_space: int = 3
-    ):
+    sparse_array: np.ndarray,
+    positions: np.ndarray,
+    sigmas: Union[float, tuple],
+    dim_space: int = 3,
+):
     """
     Use this function to smooth a sparse array using a Gaussian kernel
     if you expect the output to be a sparse array as well.
