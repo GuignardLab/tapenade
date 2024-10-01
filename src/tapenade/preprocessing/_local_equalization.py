@@ -4,7 +4,6 @@ import numpy as np
 from scipy.ndimage import zoom
 
 
-
 def _local_equalization(
     image: np.ndarray,
     box_size: int,
@@ -67,7 +66,7 @@ def _local_equalization(
         box = image[tuple(slices)].copy()
 
         # for debug, actually should not be necessary
-        if box.size < 0.2 * box_length ** image.ndim:
+        if box.size < 0.2 * box_length**image.ndim:
             continue
 
         if mask is not None:
@@ -82,15 +81,15 @@ def _local_equalization(
 
     # Interpolate percentile values for each voxel
     full_percs_low = zoom(
-        percs_low, 
-        zoom=[s / n for s, n in zip(array_shape, grid_shape)],     
-        order=1
+        percs_low,
+        zoom=[s / n for s, n in zip(array_shape, grid_shape, strict=False)],
+        order=1,
     )
 
     full_percs_high = zoom(
         percs_high,
-        zoom=[s / n for s, n in zip(array_shape, grid_shape)],
-        order=1
+        zoom=[s / n for s, n in zip(array_shape, grid_shape, strict=False)],
+        order=1,
     )
 
     denom = full_percs_high - full_percs_low
