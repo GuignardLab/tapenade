@@ -1,6 +1,7 @@
 from ._preprocessing import (
     change_array_pixelsize,
     compute_mask,
+    global_image_equalization,
     local_image_equalization,
     normalize_intensity,
     segment_stardist,
@@ -17,6 +18,7 @@ from ._preprocessing import (
 __all__ = [
     "change_array_pixelsize",
     "compute_mask",
+    "global_image_equalization",
     "local_image_equalization",
     "normalize_intensity",
     "segment_stardist",

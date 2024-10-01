@@ -281,6 +281,50 @@ def compute_mask(
 
     return mask
 
+def global_image_equalization(
+    image: np.ndarray,
+    perc_low: float,
+    perc_high: float,
+    mask: np.ndarray = None,
+    n_jobs: int = -1,
+) -> np.ndarray:
+    
+    """
+    Performs global image equalization on either a single image or a temporal stack of images.
+    Stretches the image histogram by remapping intesities in the range [perc_low, perc_high] to the range [0, 1].
+    This helps to enhance the contrast and improve the visibility of structures in the image.
+
+    Parameters:
+    - image: numpy array, input image or temporal stack of images
+    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
+    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
+    - mask: numpy array, binary mask used to set the background to zero (optional)
+    - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
+
+    Returns:
+    - image_norm: numpy array, equalized image or stack of equalized images
+    """
+
+    is_temporal = image.ndim == 4
+
+    if is_temporal:
+        # apply percentile function along first axis
+        perc_low, perc_high = np.nanpercentile(
+            image, 
+            q=[perc_low, perc_high], 
+            axis=(1,2,3),
+            keepdims=True
+        )
+    else:
+        perc_low, perc_high = np.nanpercentile(image, [perc_low, perc_high])
+
+    image_norm = (image - perc_low) / (perc_high - perc_low + 1e-8)
+
+    if not(mask is None):
+        image_norm = np.where(mask, image_norm, 0.0)
+
+    return np.clip(image_norm, 0, 1)
+    
 
 def local_image_equalization(
     image: np.ndarray,
@@ -299,8 +343,8 @@ def local_image_equalization(
     Parameters:
     - image: numpy array, input image or temporal stack of images
     - box_size: int, size of the local neighborhood for equalization
-    - perc_low: float, lower percentile for intensity equalization
-    - perc_high: float, upper percentile for intensity equalization
+    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
+    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
     - mask: numpy array, binary mask used to set the background to zero (optional)
     - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
