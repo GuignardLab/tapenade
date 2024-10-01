@@ -219,7 +219,6 @@ def _compute_mask(
     method: str,
     sigma_blur: float,
     threshold_factor: float = 1,
-    # compute_convex_hull: bool = False,
     keep_largest_cc: bool = True,
     post_processing_method: str = "fill_holes",
     registered_image: bool = False,
@@ -245,7 +244,7 @@ def _compute_mask(
     """
 
     # Normalize the image
-    percs = np.percentile(image, [1, 99])
+    percs = np.nanpercentile(image, [1, 99])
     im = (image - percs[0]) / (percs[1] - percs[0])
     im = np.clip(im, 0, 1).astype(np.float32)
 

@@ -74,7 +74,10 @@ def _local_equalization(
             if box.size == 0:
                 continue
 
-        val_low, val_high = np.percentile(box, [perc_low, perc_high])
+        val_low, val_high = np.nanpercentile(box, [perc_low, perc_high])
+
+        if np.isnan(val_low) or np.isnan(val_high):
+            continue
 
         percs_low[tuple(indices_percs)] = val_low
         percs_high[tuple(indices_percs)] = val_high
