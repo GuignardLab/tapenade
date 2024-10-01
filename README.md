@@ -6,7 +6,7 @@
 [![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
 [![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
-<img src="https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/tapenade3.png" width="100">
+<img src="https://github.com/GuignardLab/tapenade/blob/main/imgs/tapenade3.png" width="100">
 
 A fully-visual pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
@@ -27,7 +27,7 @@ If you use this plugin for your research, please [cite us](https://github.com/Gu
 
 ## Overview
 
-<img src="https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/Fig_overview_github.png" width="1000">
+<img src="https://github.com/GuignardLab/tapenade/blob/main/imgs/Fig_overview_github.png" width="1000">
 
 The Tapenade pipeline is a tool for the analysis of dense 3D tissues acquired with deep imaging microscopy. It is designed to be user-friendly and to provide a comprehensive analysis of the data. The pipeline is composed of several steps, each of which can be run independently.
 
@@ -81,11 +81,11 @@ This will install only the main library, without the libraries for the registrat
 
 ### Registration and fusion (optional)
 
-The registration and fusion methods require the `3D-registration` Python package. To install it, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/Packaging?tab=readme-ov-file#installation).
+The registration and fusion methods require the `3D-registration` Python package. To install it, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
 
 ### Segmentation (optional)
 
-We provide trained weights for StarDist3D, a state-of-the-art deep learning model for nuclei segmentation. To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/Packaging?tab=readme-ov-file#installation).
+We provide trained weights for StarDist3D, a state-of-the-art deep learning model for nuclei segmentation. To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
 
 If you prefer to use StarDist3D with a graphical user interface, Stardist3D is also available as a plugin in several softwares, like [Napari](https://github.com/stardist/stardist-napari), [Fiji](https://imagej.net/plugins/stardist), and [Icy](https://github.com/stardist/stardist-icy) (more details on the [Stardist3D repository](https://github.com/stardist/stardist?tab=readme-ov-file#plugins-for-other-software)).
 
