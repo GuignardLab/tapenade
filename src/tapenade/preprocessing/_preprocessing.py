@@ -11,8 +11,6 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
 from tapenade.preprocessing._array_rescaling import _change_array_pixelsize
-from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._thresholding import _compute_mask
 from tapenade.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
 )
@@ -20,13 +18,10 @@ from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
 from tapenade.preprocessing._local_equalization import _local_equalization
+from tapenade.preprocessing._segmentation import _load_model, _segment_stardist
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
-    _masked_smooth_gaussian_sparse
-)
-from tapenade.preprocessing._segmentation import (
-    _segment_stardist,
-    _load_model
+    _masked_smooth_gaussian_sparse,
 )
 from tapenade.preprocessing._thresholding import _compute_mask
 
@@ -49,87 +44,89 @@ In typical order:
 """
 
 
-def isotropize_and_normalize(mask,image,labels,scale,sigma:float=None,pos_ref:int=0) :
-    """
-    Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
-    Parameters
-    ----------
-    mask : np.array (bool)
-        mask of the image
-    image : np.array
-        image to normalize
-    labels : np.array
-        labels of the mask
-    scale : tuple
-        scale factors for the isotropic transformation
-    sigma : int
-        sigma for the gaussian filter
-    pos_ref : int
-        position of the reference channel, starting from 0
-    Returns
-    -------
-    norm_image : np.array
-        normalized and isotropic image
-    """
+# def isotropize_and_normalize(
+#     mask, image, labels, scale, sigma: float = None, pos_ref: int = 0
+# ):
+#     """
+#     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
+#     Parameters
+#     ----------
+#     mask : np.array (bool)
+#         mask of the image
+#     image : np.array
+#         image to normalize
+#     labels : np.array
+#         labels of the mask
+#     scale : tuple
+#         scale factors for the isotropic transformation
+#     sigma : int
+#         sigma for the gaussian filter
+#     pos_ref : int
+#         position of the reference channel, starting from 0
+#     Returns
+#     -------
+#     norm_image : np.array
+#         normalized and isotropic image
+#     """
 
-    if len(image.shape) > 3:  # if multichannel image
-        nb_channels = image.shape[1]
-        assert (
-            pos_ref < nb_channels
-        ), "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
-        iso_image = []
-        liste_channels = np.linspace(
-            0, nb_channels - 1, nb_channels, dtype=int
-        )
-        for ch in liste_channels:
-            channel = image[:, ch, :, :]
-            (mask_iso, channel_iso, seg_iso) = change_arrays_pixelsize(
-                mask=mask,
-                image=channel,
-                labels=labels,
-                input_pixelsize=scale,
-                output_pixelsize=(1, 1, 1),
-                order=1,
-                n_jobs=-1,
-            )
-            iso_image.append(channel_iso)
+#     if len(image.shape) > 3:  # if multichannel image
+#         nb_channels = image.shape[1]
+#         assert (
+#             pos_ref < nb_channels
+#         ), "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
+#         iso_image = []
+#         liste_channels = np.linspace(
+#             0, nb_channels - 1, nb_channels, dtype=int
+#         )
+#         for ch in liste_channels:
+#             channel = image[:, ch, :, :]
+#             (mask_iso, channel_iso, seg_iso) = change_arrays_pixelsize(
+#                 mask=mask,
+#                 image=channel,
+#                 labels=labels,
+#                 input_pixelsize=scale,
+#                 output_pixelsize=(1, 1, 1),
+#                 order=1,
+#                 n_jobs=-1,
+#             )
+#             iso_image.append(channel_iso)
 
-        iso_image = np.array(iso_image)
-        iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
+#         iso_image = np.array(iso_image)
+#         iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
 
-        ref_channel = iso_image[
-            :, pos_ref, :, :
-        ]  # should check before if pos_ref>=iso_image.shape[1]
-        liste_float_channels = np.delete(liste_channels, pos_ref)
-        norm_image = np.zeros_like(iso_image)
-        for ch_float in liste_float_channels:
-            channel = iso_image[:, ch_float, :, :]
-            channel_norm, ref_norm = normalize_intensity(
-                image=channel,
-                ref_image=ref_channel,
-                mask=mask_iso,
-                labels=seg_iso,
-                sigma=sigma,
-            )
-            norm_image[:, ch_float, :, :] = channel_norm
-        norm_image[:, pos_ref, :, :] = ref_norm
+#         ref_channel = iso_image[
+#             :, pos_ref, :, :
+#         ]  # should check before if pos_ref>=iso_image.shape[1]
+#         liste_float_channels = np.delete(liste_channels, pos_ref)
+#         norm_image = np.zeros_like(iso_image)
+#         for ch_float in liste_float_channels:
+#             channel = iso_image[:, ch_float, :, :]
+#             channel_norm, ref_norm = normalize_intensity(
+#                 image=channel,
+#                 ref_image=ref_channel,
+#                 mask=mask_iso,
+#                 labels=seg_iso,
+#                 sigma=sigma,
+#             )
+#             norm_image[:, ch_float, :, :] = channel_norm
+#         norm_image[:, pos_ref, :, :] = ref_norm
 
-    else:  # 3D data, one channel
-        (mask_iso, iso_image, seg_iso) = change_arrays_pixelsize(
-            mask=mask,
-            image=image,
-            labels=labels,
-            reshape_factors=np.divide(scale, (1, 1, 1)),
-        )
-        norm_image, _ = normalize_intensity(
-            image=iso_image,
-            ref_image=iso_image,
-            mask=mask_iso,
-            labels=seg_iso,
-            sigma=sigma,
-        )
+#     else:  # 3D data, one channel
+#         (mask_iso, iso_image, seg_iso) = change_arrays_pixelsize(
+#             mask=mask,
+#             image=image,
+#             labels=labels,
+#             reshape_factors=np.divide(scale, (1, 1, 1)),
+#         )
+#         norm_image, _ = normalize_intensity(
+#             image=iso_image,
+#             ref_image=iso_image,
+#             mask=mask_iso,
+#             labels=seg_iso,
+#             sigma=sigma,
+#         )
 
-    return (mask_iso, norm_image, seg_iso)
+#     return (mask_iso, norm_image, seg_iso)
 
 
 def change_array_pixelsize(
@@ -162,7 +159,9 @@ def change_array_pixelsize(
         if n_jobs == 1:
             # Sequential resizing of each time frame
             resized_array = [
-                _change_array_pixelsize(arr, input_pixelsize, output_pixelsize, order=order)
+                _change_array_pixelsize(
+                    arr, input_pixelsize, output_pixelsize, order=order
+                )
                 for arr in tqdm(
                     array,
                     desc="Making array isotropic",
@@ -194,13 +193,14 @@ def change_array_pixelsize(
     else:
         # Resizing the whole image
         resized_array = _change_array_pixelsize(
-            array, 
+            array,
             input_pixelsize=input_pixelsize,
             output_pixelsize=output_pixelsize,
             order=order,
         )
 
     return resized_array
+
 
 def compute_mask(
     image: np.ndarray,
@@ -400,7 +400,7 @@ def normalize_intensity(
                     width=width,
                 )
                 for im, ref_im, ma, lab in tqdm(
-                    zip(image, ref_image, mask, labels),
+                    zip(image, ref_image, mask, labels, strict=False),
                     desc="Normalizing intensity",
                     total=image.shape[0],
                 )
@@ -422,7 +422,7 @@ def normalize_intensity(
 
             normalized_array = process_map(
                 func_parallel,
-                zip(image, ref_image),
+                zip(image, ref_image, strict=False),
                 max_workers=max_workers,
                 desc="Normalizing intensity",
                 total=image.shape[0],
@@ -438,7 +438,7 @@ def normalize_intensity(
             labels=labels,
             width=width,
         )
-    
+
     return np.array(normalized_array)
 
 
@@ -448,7 +448,6 @@ def segment_stardist(
     thresholds_dict: dict = None,
     n_jobs: int = -1,
 ) -> np.ndarray:
-    
     """
     Predict the segmentation of an array using a StarDist model.
 
@@ -475,7 +474,7 @@ def segment_stardist(
                 )
                 for im in tqdm(image, desc="Predicting with StarDist")
             ],
-            dtype=np.uint16
+            dtype=np.uint16,
         )
 
     else:
@@ -487,6 +486,7 @@ def segment_stardist(
 
     return labels
 
+
 def segment_stardist_from_files(
     image_files: list[str],
     path_to_save: str,
@@ -494,19 +494,17 @@ def segment_stardist_from_files(
     func_params: dict,
 ):
 
-    model = _load_model(func_params["model_path"])    
+    model = _load_model(func_params["model_path"])
 
     for file in image_files:
         image = tifffile.imread(file)
         labels = _segment_stardist(
             image,
             model=model,
-            thresholds_dict=func_params.get("thresholds_dict", None),
+            thresholds_dict=func_params.get("thresholds_dict"),
         )
         tifffile.imwrite(
-            f"{path_to_save}/segmented_{file}",
-            labels,
-            **compress_params
+            f"{path_to_save}/segmented_{file}", labels, **compress_params
         )
 
 
@@ -619,21 +617,28 @@ def _load_array_rotate_and_save_to_file(
     array = tifffile.imread(array_file)
     mask = tifffile.imread(mask_file)
     array_rotated = rotate(
-        array, angle=rotation_angle, axes=rotation_plane_indices, reshape=True, order=order
+        array,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=order,
     )
     mask_rotated = rotate(
-        mask, angle=rotation_angle, axes=rotation_plane_indices, 
-        reshape=True, order=0
+        mask,
+        angle=rotation_angle,
+        axes=rotation_plane_indices,
+        reshape=True,
+        order=0,
     )
     array_rotated = np.where(mask_rotated, array_rotated, 0)
     if order > 1:
         # preserve the original intensity range
         array_rotated = np.clip(array_rotated, array.min(), array.max())
-        
+
     tifffile.imwrite(
         f"{path_to_save}/aligned_{index:>04}.tif",
         array_rotated,
-        **compress_params
+        **compress_params,
     )
 
 
@@ -642,7 +647,7 @@ def align_array_major_axis_from_files(
     array_files: list[str],
     path_to_save: str,
     compress_params: dict,
-    func_params: dict, 
+    func_params: dict,
 ):
     """
     Aligns the major axis of an array to a target axis in a specified rotation plane.
@@ -681,12 +686,16 @@ def align_array_major_axis_from_files(
 
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        res = list(tqdm(
-            executor.map(multithreaded_function, array_files, mask_files, range(len(array_files))),
+        tqdm(
+            executor.map(
+                multithreaded_function,
+                array_files,
+                mask_files,
+                range(len(array_files)),
+            ),
             total=len(array_files),
             desc="Aligning array",
-        ))
-    
+        )
 
 
 def crop_array_using_mask(
@@ -757,9 +766,7 @@ def _load_array_crop_and_save_to_file(
 ):
     array = tifffile.imread(array_file)[mask_slice]
     tifffile.imwrite(
-        f"{path_to_save}/cropped_{index:>04}.tif",
-        array,
-        **compress_params
+        f"{path_to_save}/cropped_{index:>04}.tif", array, **compress_params
     )
 
 
@@ -820,11 +827,15 @@ def crop_array_using_mask_from_files(
     )
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        res = list(tqdm(
-            executor.map(multithreaded_function, array_files, range(len(array_files))),
+        tqdm(
+            executor.map(
+                multithreaded_function,
+                array_files,
+                range(len(array_files)),
+            ),
             total=len(array_files),
             desc="Cropping array",
-        ))
+        )
 
 
 def _parallel_gaussian_smooth(
@@ -871,7 +882,7 @@ def masked_gaussian_smoothing(
         if n_jobs == 1:
 
             iterable = tqdm(
-                zip(image, mask, mask_for_volume),
+                zip(image, mask, mask_for_volume, strict=False),
                 total=len(image),
                 desc="Smoothing image",
             )
@@ -879,7 +890,7 @@ def masked_gaussian_smoothing(
             return np.array([func(elem) for elem in iterable])
 
         else:
-            elems = [elem for elem in zip(image, mask)]
+            elems = list(zip(image, mask, strict=False))
 
             max_workers = (
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
@@ -1077,9 +1088,9 @@ def masked_gaussian_smooth_sparse(
     Parameters
     ----------
     sparse_array : np.ndarray or list of np.ndarray
-        Array of points to smooth in format (n_points, n_dim_space + n_dim_points). 
-        The first columns (up to dim_space, i.e [:dim_space]) must be the spatial coordinates. 
-        The remaining columns are the values/vectors to smooth. A temporal sparse array is a 
+        Array of points to smooth in format (n_points, n_dim_space + n_dim_points).
+        The first columns (up to dim_space, i.e [:dim_space]) must be the spatial coordinates.
+        The remaining columns are the values/vectors to smooth. A temporal sparse array is a
         list of sparse arrays, one for each time point.
     is_temporal : bool
         If True, the array is temporal and the smoothing is applied to each time step.
@@ -1118,7 +1129,7 @@ def masked_gaussian_smooth_sparse(
                             zip(
                                 sparse_array,
                                 positions,
-                                disable=not progress_bars,
+                                disable=not progress_bars, strict=False,
                             )
                         )
                     ]
@@ -1185,4 +1196,3 @@ def masked_gaussian_smooth_sparse(
             sigmas=sigmas,
             dim_space=dim_space,
         )
-
