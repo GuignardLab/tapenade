@@ -325,6 +325,26 @@ def global_image_equalization(
 
     return np.clip(image_norm, 0, 1)
     
+def _local_equalization_parallel(
+    tuple_input: tuple[np.ndarray, np.ndarray],
+    box_size: int,
+    perc_low: float,
+    perc_high: float,
+) -> np.ndarray:
+
+    image, mask = tuple_input
+
+    image_norm = _local_equalization(
+        image,
+        box_size=box_size,
+        perc_low=perc_low,
+        perc_high=perc_high,
+        mask=mask,
+    )
+
+    return image_norm
+
+        
 
 def local_image_equalization(
     image: np.ndarray,
@@ -360,21 +380,35 @@ def local_image_equalization(
         if mask_is_None:
             mask = [None] * image.shape[0]
 
-        # Apply local equalization to each time frame in the temporal stack
-        image_norm = np.array(
-            [
-                _local_equalization(
-                    image[ind_t],
-                    box_size=box_size,
-                    perc_low=perc_low,
-                    perc_high=perc_high,
-                    mask=mask[ind_t],
-                )
-                for ind_t in tqdm(
-                    range(image.shape[0]), desc="Local equalization"
+        func_parallel = partial(
+            _local_equalization_parallel,
+            box_size=box_size,
+            perc_low=perc_low,
+            perc_high=perc_high,
+        )
+
+        if n_jobs == 1:
+            # Sequential processing
+            image_norm = [
+                func_parallel(im, mask=ma)
+                for im, ma in tqdm(
+                    zip(image, mask), desc="Local equalization", total=image.shape[0]
                 )
             ]
-        )
+
+        else:
+            # Parallel processing
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
+
+            image_norm = process_map(
+                func_parallel,
+                zip(image, mask),
+                max_workers=max_workers,
+                desc="Local equalization",
+                total=image.shape[0],
+            )
     else:
         # Apply local equalization to the image
         image_norm = _local_equalization(
