@@ -44,89 +44,93 @@ In typical order:
 """
 
 
-# def isotropize_and_normalize(
-#     mask, image, labels, scale, sigma: float = None, pos_ref: int = 0
-# ):
-#     """
-#     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
-#     Parameters
-#     ----------
-#     mask : np.array (bool)
-#         mask of the image
-#     image : np.array
-#         image to normalize
-#     labels : np.array
-#         labels of the mask
-#     scale : tuple
-#         scale factors for the isotropic transformation
-#     sigma : int
-#         sigma for the gaussian filter
-#     pos_ref : int
-#         position of the reference channel, starting from 0
-#     Returns
-#     -------
-#     norm_image : np.array
-#         normalized and isotropic image
-#     """
+def isotropize_and_normalize(
+    image , mask, labels, scale, sigma: float = None, pos_ref: int = 0
+):
+    """
+    Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
+    In the latter case, the reference channel is the image itself.
+    Parameters
+    ----------
+    image : np.array
+        image to normalize
+    mask : np.array (bool)
+        mask of the image
+    labels : np.array
+        labels of the mask
+    scale : tuple
+        scale factors for the isotropic transformation
+    sigma : int
+        sigma for the gaussian filter
+    pos_ref : int
+        position of the reference channel, starting from 0. This is not taken into account if the image is a single channel.
+    Returns
+    -------
+    norm_image : np.array
+        normalized and isotropic image
+    """
 
-#     if len(image.shape) > 3:  # if multichannel image
-#         nb_channels = image.shape[1]
-#         assert (
-#             pos_ref < nb_channels
-#         ), "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
-#         iso_image = []
-#         liste_channels = np.linspace(
-#             0, nb_channels - 1, nb_channels, dtype=int
-#         )
-#         for ch in liste_channels:
-#             channel = image[:, ch, :, :]
-#             (mask_iso, channel_iso, seg_iso) = change_arrays_pixelsize(
-#                 mask=mask,
-#                 image=channel,
-#                 labels=labels,
-#                 input_pixelsize=scale,
-#                 output_pixelsize=(1, 1, 1),
-#                 order=1,
-#                 n_jobs=-1,
-#             )
-#             iso_image.append(channel_iso)
+    if len(image.shape) > 3:  # if multichannel image
+        nb_channels = image.shape[1]
+        assert (
+            pos_ref < nb_channels
+        ), "The index of the reference channel should not bigger than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
+        iso_image = []
+        liste_channels = np.linspace(
+            0, nb_channels - 1, nb_channels, dtype=int
+        )
+        for ch in liste_channels:
+            channel = image[:, ch, :, :]
+            channel_iso = change_array_pixelsize(
+                array=channel,
+                input_pixelsize=scale,
+                output_pixelsize=(1, 1, 1),
+                order=1,
+                n_jobs=-1,
+            )
+            iso_image.append(channel_iso)
 
-#         iso_image = np.array(iso_image)
-#         iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
+        iso_image = np.array(iso_image)
+        iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
+        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        ref_channel = iso_image[
+            :, pos_ref, :, :
+        ] 
+        liste_float_channels = np.delete(liste_channels, pos_ref)
+        norm_image = np.zeros_like(iso_image)
+        for ch_float in liste_float_channels:
+            channel = iso_image[:, ch_float, :, :]
+            channel_norm = normalize_intensity(
+                image=channel,
+                ref_image=ref_channel,
+                mask=mask_iso,
+                labels=seg_iso,
+                sigma=sigma,
+            )
+            
+            norm_image[:, ch_float, :, :] = channel_norm
+        ref_norm = normalize_intensity(image=ref_channel, ref_image=ref_channel, mask=mask_iso, labels=seg_iso, sigma=sigma)
+        norm_image[:, pos_ref, :, :] = ref_norm
 
-#         ref_channel = iso_image[
-#             :, pos_ref, :, :
-#         ]  # should check before if pos_ref>=iso_image.shape[1]
-#         liste_float_channels = np.delete(liste_channels, pos_ref)
-#         norm_image = np.zeros_like(iso_image)
-#         for ch_float in liste_float_channels:
-#             channel = iso_image[:, ch_float, :, :]
-#             channel_norm, ref_norm = normalize_intensity(
-#                 image=channel,
-#                 ref_image=ref_channel,
-#                 mask=mask_iso,
-#                 labels=seg_iso,
-#                 sigma=sigma,
-#             )
-#             norm_image[:, ch_float, :, :] = channel_norm
-#         norm_image[:, pos_ref, :, :] = ref_norm
+    else:  # 3D data, one channel
+        iso_image = change_array_pixelsize(
+            array=image,
+            labels=labels,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+        )
+        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        norm_image, _ = normalize_intensity(
+            image=iso_image,
+            ref_image=iso_image,
+            mask=mask_iso,
+            labels=seg_iso,
+            sigma=sigma,
+        )
 
-#     else:  # 3D data, one channel
-#         (mask_iso, iso_image, seg_iso) = change_arrays_pixelsize(
-#             mask=mask,
-#             image=image,
-#             labels=labels,
-#             reshape_factors=np.divide(scale, (1, 1, 1)),
-#         )
-#         norm_image, _ = normalize_intensity(
-#             image=iso_image,
-#             ref_image=iso_image,
-#             mask=mask_iso,
-#             labels=seg_iso,
-#             sigma=sigma,
-#         )
-
-#     return (mask_iso, norm_image, seg_iso)
+    return (norm_image, mask_iso, seg_iso)
 
 
 def change_array_pixelsize(
