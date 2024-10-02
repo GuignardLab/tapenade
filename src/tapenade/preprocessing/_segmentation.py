@@ -51,3 +51,14 @@ def _segment_stardist(image: np.ndarray, model, thresholds_dict: dict):
     )
 
     return labels.astype(np.uint16)
+
+
+def _purge_gpu_memory():
+    """
+    Purge the GPU memory.
+    """
+
+    from numba import cuda
+
+    cuda.select_device(0)
+    cuda.close()

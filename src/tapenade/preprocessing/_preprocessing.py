@@ -18,7 +18,7 @@ from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
 from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._segmentation import _load_model, _segment_stardist
+from tapenade.preprocessing._segmentation import _load_model, _segment_stardist, _purge_gpu_memory
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse,
@@ -562,6 +562,8 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
+    _purge_gpu_memory()
+
     return labels
 
 
@@ -584,6 +586,8 @@ def segment_stardist_from_files(
         tifffile.imwrite(
             f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
         )
+
+    _purge_gpu_memory()
 
 
 def align_array_major_axis(
