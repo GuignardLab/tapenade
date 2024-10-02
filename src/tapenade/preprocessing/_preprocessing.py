@@ -36,7 +36,7 @@ In typical order:
     1. making array isotropic
     2. compute mask
     3. local image equalization
-    (4. segmentation, not covered here)
+    4. segmentation, e.g with StarDist
     (5. spatial registration, not covered here)
     (6. temporal registration, not covered here)
     7. aligning major axis
