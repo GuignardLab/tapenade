@@ -281,6 +281,70 @@ def compute_mask(
 
     return mask
 
+def global_image_equalization(
+    image: np.ndarray,
+    perc_low: float,
+    perc_high: float,
+    mask: np.ndarray = None,
+    n_jobs: int = -1,
+) -> np.ndarray:
+    
+    """
+    Performs global image equalization on either a single image or a temporal stack of images.
+    Stretches the image histogram by remapping intesities in the range [perc_low, perc_high] to the range [0, 1].
+    This helps to enhance the contrast and improve the visibility of structures in the image.
+
+    Parameters:
+    - image: numpy array, input image or temporal stack of images
+    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
+    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
+    - mask: numpy array, binary mask used to set the background to zero (optional)
+    - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
+
+    Returns:
+    - image_norm: numpy array, equalized image or stack of equalized images
+    """
+
+    is_temporal = image.ndim == 4
+
+    if is_temporal:
+        # apply percentile function along first axis
+        perc_low, perc_high = np.nanpercentile(
+            image, 
+            q=[perc_low, perc_high], 
+            axis=(1,2,3),
+            keepdims=True
+        )
+    else:
+        perc_low, perc_high = np.nanpercentile(image, [perc_low, perc_high])
+
+    image_norm = (image - perc_low) / (perc_high - perc_low + 1e-8)
+
+    if not(mask is None):
+        image_norm = np.where(mask, image_norm, 0.0)
+
+    return np.clip(image_norm, 0, 1)
+    
+def _local_equalization_parallel(
+    tuple_input: tuple[np.ndarray, np.ndarray],
+    box_size: int,
+    perc_low: float,
+    perc_high: float,
+) -> np.ndarray:
+
+    image, mask = tuple_input
+
+    image_norm = _local_equalization(
+        image,
+        box_size=box_size,
+        perc_low=perc_low,
+        perc_high=perc_high,
+        mask=mask,
+    )
+
+    return image_norm
+
+        
 
 def local_image_equalization(
     image: np.ndarray,
@@ -299,8 +363,8 @@ def local_image_equalization(
     Parameters:
     - image: numpy array, input image or temporal stack of images
     - box_size: int, size of the local neighborhood for equalization
-    - perc_low: float, lower percentile for intensity equalization
-    - perc_high: float, upper percentile for intensity equalization
+    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
+    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
     - mask: numpy array, binary mask used to set the background to zero (optional)
     - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
@@ -316,21 +380,35 @@ def local_image_equalization(
         if mask_is_None:
             mask = [None] * image.shape[0]
 
-        # Apply local equalization to each time frame in the temporal stack
-        image_norm = np.array(
-            [
-                _local_equalization(
-                    image[ind_t],
-                    box_size=box_size,
-                    perc_low=perc_low,
-                    perc_high=perc_high,
-                    mask=mask[ind_t],
-                )
-                for ind_t in tqdm(
-                    range(image.shape[0]), desc="Local equalization"
+        func_parallel = partial(
+            _local_equalization_parallel,
+            box_size=box_size,
+            perc_low=perc_low,
+            perc_high=perc_high,
+        )
+
+        if n_jobs == 1:
+            # Sequential processing
+            image_norm = [
+                func_parallel(im, mask=ma)
+                for im, ma in tqdm(
+                    zip(image, mask), desc="Local equalization", total=image.shape[0]
                 )
             ]
-        )
+
+        else:
+            # Parallel processing
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
+
+            image_norm = process_map(
+                func_parallel,
+                zip(image, mask),
+                max_workers=max_workers,
+                desc="Local equalization",
+                total=image.shape[0],
+            )
     else:
         # Apply local equalization to the image
         image_norm = _local_equalization(
@@ -496,7 +574,7 @@ def segment_stardist_from_files(
 
     model = _load_model(func_params["model_path"])
 
-    for file in image_files:
+    for index, file in enumerate(image_files):
         image = tifffile.imread(file)
         labels = _segment_stardist(
             image,
@@ -504,7 +582,7 @@ def segment_stardist_from_files(
             thresholds_dict=func_params.get("thresholds_dict"),
         )
         tifffile.imwrite(
-            f"{path_to_save}/segmented_{file}", labels, **compress_params
+            f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
         )
 
 
