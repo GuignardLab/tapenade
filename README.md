@@ -127,7 +127,9 @@ The user can dynamically interact with the correlation heatmap by manually selec
 
 If you use this plugin for your research, please cite us using the following reference:
 
-[DOI in progress]
+- Jules Vanaret, Alice Gros, Valentin Dunsing-Eichenauer, Agathe Rostan, Philippe Roudot, Pierre-François Lenne, Léo Guignard, Sham Tlili
+bioRxiv 2024.08.13.607832; doi: https://doi.org/10.1101/2024.08.13.607832
+
 
 This repository has been developed by (in alphabetical order):
 
