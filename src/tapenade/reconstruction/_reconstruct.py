@@ -15,7 +15,7 @@ from scipy.spatial.transform import Rotation
 from skimage.measure import regionprops
 from skimage import io
 import transforms3d._gohlketransforms as tg
-
+from tapenade.preprocessing._preprocessing import compute_mask
 
 def extract_positions(path_positions: str):
     """
@@ -670,6 +670,8 @@ def fuse_sides(
     output_voxel: list = [1, 1, 1],
     trsf_type: str = "rigid",
     return_image=False,
+    sigma_for_mask: int = 3,
+    threshold_factor_for_mask: int = 1,
 ):
     """
     Fuse the two sides of the sample, using the previously registered images. Compute sigmoid weights from raw images, then register the weights using the transformation computed on the intensity image and then fuse the images using the registered weights.
@@ -698,6 +700,11 @@ def fuse_sides(
         type of transformation to compute : rigid, affine. By default rigid. Has to be the same as the intensity images.
     return_image : bool, optional
         if True, returns the fused image, by default False
+    sigma_for_mask : int, optional
+        sigma for the gaussian blur applied to the mask, by default 1
+    threshold_factor_for_mask : int, optional   
+        threshold factor for the mask
+
     """
 
     if isinstance(reference_image, (str | Path)):
@@ -707,16 +714,15 @@ def fuse_sides(
     dtype_input = (
         float_im.dtype
     )  # we wil return an image that has the same dtype as the input image
-    mask_r = ref_im > 0
-    mask_f = float_im > 0
+    mask_r = compute_mask(image = ref_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,compute_convex_hull=False,registered_image=False)
+    mask_f = compute_mask(image = float_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,compute_convex_hull=False,registered_image=False)
 
     # we compute the weights as a sigmoid function of the distance to the objective (=cumulative sum of the raw image)
-    cumsum_r = np.cumsum(mask_r, axis=axis)
+    cumsum_r = np.cumsum(mask_r.astype(int), axis=axis)
     cumsum_r_normalized = cumsum_r / np.max(cumsum_r)
     w_ref = sigmoid(1 - cumsum_r_normalized, z0=0.5, p=slope_coeff)
-    # w_ref[np.invert(mask_r)] = 0
 
-    cumsum_f = np.cumsum(mask_f, axis=axis)
+    cumsum_f = np.cumsum(mask_f.astype(int), axis=axis)
     cumsum_f_normalized = cumsum_f / np.max(cumsum_f)
     w_float = sigmoid(1 - cumsum_f_normalized, z0=0.5, p=slope_coeff)
 
@@ -758,12 +764,10 @@ def fuse_sides(
         Path(folder) / "registered" / floating_image
     )
     sum_weights = w_ref_after_trsf + w_float_after_trsf
-    # we sum the registered images applying the registered weights
-    fusion = (
-        ref_im_registered * w_ref_after_trsf / sum_weights
-        + float_im_registered * w_float_after_trsf / sum_weights
-    )
-    fusion[np.isnan(fusion)] = 0
+    w_ref_after_trsf[sum_weights != 0] /= sum_weights[sum_weights != 0]
+    w_float_after_trsf[sum_weights != 0] /= sum_weights[sum_weights != 0]
+    fusion = np.round(ref_im_registered * w_ref_after_trsf).astype(np.uint16)
+    fusion += np.round(float_im_registered * w_float_after_trsf).astype(np.uint16)
     if return_image:
         return fusion
     io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
