@@ -574,7 +574,7 @@ def segment_stardist_from_files(
 
     model = _load_model(func_params["model_path"])
 
-    for file in image_files:
+    for index, file in enumerate(image_files):
         image = tifffile.imread(file)
         labels = _segment_stardist(
             image,
@@ -582,7 +582,7 @@ def segment_stardist_from_files(
             thresholds_dict=func_params.get("thresholds_dict"),
         )
         tifffile.imwrite(
-            f"{path_to_save}/segmented_{file}", labels, **compress_params
+            f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
         )
 
 
