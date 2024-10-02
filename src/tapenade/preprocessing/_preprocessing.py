@@ -562,7 +562,10 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
-    _purge_gpu_memory()
+    from stardist import gputools_available
+    
+    if gputools_available():
+        _purge_gpu_memory()
 
     return labels
 
@@ -587,7 +590,10 @@ def segment_stardist_from_files(
             f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
         )
 
-    _purge_gpu_memory()
+    from stardist import gputools_available
+    
+    if gputools_available():
+        _purge_gpu_memory()
 
 
 def align_array_major_axis(
