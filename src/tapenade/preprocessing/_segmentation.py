@@ -2,12 +2,6 @@ import warnings
 
 import numpy as np
 
-try:
-    from stardist import gputools_available
-    from stardist.models import StarDist3D
-except ImportError:
-    warnings.warn("Please install Stardist for your system")
-
 import os
 from pathlib import Path
 
@@ -19,6 +13,11 @@ def _load_model(model_path: str):
     Parameters:
     - model_path: str, path to the StarDist model folder
     """
+
+    try:
+        from stardist.models import StarDist3D
+    except ImportError:
+        warnings.warn("Please install Stardist for your system")
 
     model_name = Path(model_path).stem
     directory = str(os.path.split(model_path)[0])
@@ -40,6 +39,11 @@ def _segment_stardist(image: np.ndarray, model, thresholds_dict: dict):
       respectively
     """
 
+    try:
+        from stardist import gputools_available
+    except ImportError:
+        warnings.warn("Please install Stardist for your system")
+
     if gputools_available():
         model.use_gpu = True
 
@@ -51,3 +55,14 @@ def _segment_stardist(image: np.ndarray, model, thresholds_dict: dict):
     )
 
     return labels.astype(np.uint16)
+
+
+def _purge_gpu_memory():
+    """
+    Purge the GPU memory.
+    """
+
+    from numba import cuda
+
+    cuda.select_device(0)
+    cuda.close()

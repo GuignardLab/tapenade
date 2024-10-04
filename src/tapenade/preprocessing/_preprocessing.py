@@ -18,7 +18,7 @@ from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
 from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._segmentation import _load_model, _segment_stardist
+from tapenade.preprocessing._segmentation import _load_model, _segment_stardist, _purge_gpu_memory
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse,
@@ -36,7 +36,7 @@ In typical order:
     1. making array isotropic
     2. compute mask
     3. local image equalization
-    (4. segmentation, not covered here)
+    4. segmentation, e.g with StarDist
     (5. spatial registration, not covered here)
     (6. temporal registration, not covered here)
     7. aligning major axis
@@ -562,6 +562,11 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
+    from stardist import gputools_available
+    
+    if gputools_available():
+        _purge_gpu_memory()
+
     return labels
 
 
@@ -584,6 +589,11 @@ def segment_stardist_from_files(
         tifffile.imwrite(
             f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
         )
+
+    from stardist import gputools_available
+    
+    if gputools_available():
+        _purge_gpu_memory()
 
 
 def align_array_major_axis(
