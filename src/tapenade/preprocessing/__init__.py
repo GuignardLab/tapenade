@@ -1,4 +1,5 @@
 from ._preprocessing import (
+    isotropize_and_normalize,
     change_array_pixelsize,
     compute_mask,
     global_image_equalization,
@@ -16,6 +17,7 @@ from ._preprocessing import (
 )
 
 __all__ = [
+    "isotropize_and_normalize",
     "change_array_pixelsize",
     "compute_mask",
     "global_image_equalization",
