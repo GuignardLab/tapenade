@@ -304,17 +304,17 @@ def reorganize_array_dimension(
         ind_X = str_shape.index(str(nb_X))
 
         (size_T, ind_T) = (
-            (int(nb_timepoints), str_shape.index(nb_timepoints))
+            (int(nb_timepoints.split('_')[0]), str_shape.index(nb_timepoints))
             if nb_timepoints != "None"
             else (1, None)
         )
         (size_C, ind_C) = (
-            (int(nb_channels), str_shape.index(nb_channels))
+            (int(nb_channels.split('_')[0]), str_shape.index(nb_channels))
             if nb_channels != "None"
             else (1, None)
         )
         (size_Z, ind_Z) = (
-            (int(nb_depth), str_shape.index(nb_depth))
+             (int(nb_depth.split('_')[0]), str_shape.index(nb_depth))
             if nb_depth != "None"
             else (1, None)
         )
