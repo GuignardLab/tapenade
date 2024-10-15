@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+title: tapenade
+message: 'If you use this software, please cite it as below.'
+type: software
+authors:
+  - given-names: Jules
+    family-names: Vanaret
+    email: jules.vanaret@univ-amu.fr
+  - given-names: Alice
+    family-names: Gros
+  - given-names: Valentin
+    family-names: Dunsing Eichenauer
+  - given-names: Agathe
+    family-names: Rostan
+  - given-names: Philippe
+    family-names: Roudot
+  - given-names: Pierre-François
+    family-names: Lenne
+  - given-names: Léo
+    family-names: Guignard
+    email: leo.guignard@univ-amu.fr
+  - given-names: Sham
+    family-names: Tlili
+    email: sham.tlili@univ-amu.fr
+identifiers:
+  - type: doi
+    value: 10.1101/2024.08.13.607832
+repository-code: 'https://github.com/GuignardLab/tapenade'
+abstract: >-
+  A fully-visual pipeline for quantitative analysis of 3D
+  organoid images acquired with deep imaging microscopy.
+license: MIT

@@ -1,7 +1,9 @@
 from ._preprocessing import (
+    isotropize_and_normalize,
     change_array_pixelsize,
     compute_mask,
     reorganize_array_dimension,
+    global_image_equalization,
     local_image_equalization,
     normalize_intensity,
     segment_stardist,
@@ -16,9 +18,11 @@ from ._preprocessing import (
 )
 
 __all__ = [
+    "isotropize_and_normalize",
     "change_array_pixelsize",
     "compute_mask",
     "reorganize_array_dimension",
+    "global_image_equalization",
     "local_image_equalization",
     "normalize_intensity",
     "segment_stardist",

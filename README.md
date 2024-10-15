@@ -6,7 +6,7 @@
 [![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
 [![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
-<img src="https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/tapenade3.png" width="100">
+<img src="https://github.com/GuignardLab/tapenade/blob/main/imgs/tapenade3.png" width="100">
 
 A fully-visual pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
@@ -27,7 +27,7 @@ If you use this plugin for your research, please [cite us](https://github.com/Gu
 
 ## Overview
 
-<img src="https://github.com/GuignardLab/tapenade/blob/Packaging/imgs/Fig_overview_github.png" width="1000">
+<img src="https://github.com/GuignardLab/tapenade/blob/main/imgs/Fig_overview_github.png" width="1000">
 
 The Tapenade pipeline is a tool for the analysis of dense 3D tissues acquired with deep imaging microscopy. It is designed to be user-friendly and to provide a comprehensive analysis of the data. The pipeline is composed of several steps, each of which can be run independently.
 
@@ -81,11 +81,11 @@ This will install only the main library, without the libraries for the registrat
 
 ### Registration and fusion (optional)
 
-The registration and fusion methods require the `3D-registration` Python package. To install it, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/Packaging?tab=readme-ov-file#installation).
+The registration and fusion methods require the `3D-registration` Python package. To install it, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
 
 ### Segmentation (optional)
 
-We provide trained weights for StarDist3D, a state-of-the-art deep learning model for nuclei segmentation. To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/Packaging?tab=readme-ov-file#installation).
+We provide trained weights for StarDist3D, a state-of-the-art deep learning model for nuclei segmentation. To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
 
 If you prefer to use StarDist3D with a graphical user interface, Stardist3D is also available as a plugin in several softwares, like [Napari](https://github.com/stardist/stardist-napari), [Fiji](https://imagej.net/plugins/stardist), and [Icy](https://github.com/stardist/stardist-icy) (more details on the [Stardist3D repository](https://github.com/stardist/stardist?tab=readme-ov-file#plugins-for-other-software)).
 
@@ -97,13 +97,13 @@ Though not mandatory, we also recommend running the inference with StarDist3D on
 
 The methods described above are available at the following locations:
 
-1. **Spectral filtering**: [Code](preprocessing.spectral_filtering.XXX), [Notebook](notebooks/spectral_filtering_notebook.ipynb)
-2. **Registration & fusion**: [Code](reconstruction.register), [Notebook](notebooks/registration_notebook.ipynb)
-3. **Pre-processing**: This [script](analysis.preprocessing._preprocessing.py) gathers all preprocessing functions, [Notebook](notebooks/preprocessing_notebook.ipynb)
-4. **Segmentation**: [Code](segmentation.predict_stardist), [Notebook](notebooks/segmentation_notebook.ipynb)
-4. **Masked smoothing**: [Code](preprocessing.masked_smooth_gaussian), [Notebook](notebooks/masked_gaussian_smoothing_notebook.ipynb)
-5. **Spatial correlation analysis**: [Code](analysis.spatial_correlation.SpatialCorrelationPlotter), [Notebook](notebooks/spatial_correlation_analysis_notebook.ipynb)
-6. **Deformation tensors analysis**: [Code](analysis.deformation.XXX), [Notebook](notebooks/deformation_analysis_notebook.ipynb)
+1. **Spectral filtering**: [Code](src/tapenade/preprocessing/spectral_filtering/XXX), [Notebook](tapenade/notebooks/spectral_filtering_notebook.ipynb)
+2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](tapenade/notebooks/registration_notebook.ipynb)
+3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](tapenade/notebooks/preprocessing_notebook.ipynb)
+4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](tapenade/notebooks/segmentation_notebook.ipynb)
+4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](tapenade/notebooks/masked_gaussian_smoothing_notebook.ipynb)
+5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](tapenade/notebooks/spatial_correlation_analysis_notebook.ipynb)
+6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](tapenade/notebooks/deformation_analysis_notebook.ipynb)
 
 All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
 
@@ -127,7 +127,9 @@ The user can dynamically interact with the correlation heatmap by manually selec
 
 If you use this plugin for your research, please cite us using the following reference:
 
-[DOI in progress]
+- Jules Vanaret, Alice Gros, Valentin Dunsing-Eichenauer, Agathe Rostan, Philippe Roudot, Pierre-François Lenne, Léo Guignard, Sham Tlili
+bioRxiv 2024.08.13.607832; doi: https://doi.org/10.1101/2024.08.13.607832
+
 
 This repository has been developed by (in alphabetical order):
 

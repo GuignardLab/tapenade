@@ -18,7 +18,7 @@ from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
 from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._segmentation import _load_model, _segment_stardist
+from tapenade.preprocessing._segmentation import _load_model, _segment_stardist, _purge_gpu_memory
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse,
@@ -36,7 +36,7 @@ In typical order:
     1. making array isotropic
     2. compute mask
     3. local image equalization
-    (4. segmentation, not covered here)
+    4. segmentation, e.g with StarDist
     (5. spatial registration, not covered here)
     (6. temporal registration, not covered here)
     7. aligning major axis
@@ -44,89 +44,93 @@ In typical order:
 """
 
 
-# def isotropize_and_normalize(
-#     mask, image, labels, scale, sigma: float = None, pos_ref: int = 0
-# ):
-#     """
-#     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
-#     Parameters
-#     ----------
-#     mask : np.array (bool)
-#         mask of the image
-#     image : np.array
-#         image to normalize
-#     labels : np.array
-#         labels of the mask
-#     scale : tuple
-#         scale factors for the isotropic transformation
-#     sigma : int
-#         sigma for the gaussian filter
-#     pos_ref : int
-#         position of the reference channel, starting from 0
-#     Returns
-#     -------
-#     norm_image : np.array
-#         normalized and isotropic image
-#     """
+def isotropize_and_normalize(
+    image , mask, labels, scale, sigma: float = None, pos_ref: int = 0
+):
+    """
+    Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
+    In the latter case, the reference channel is the image itself.
+    Parameters
+    ----------
+    image : np.array
+        image to normalize
+    mask : np.array (bool)
+        mask of the image
+    labels : np.array
+        labels of the mask
+    scale : tuple
+        scale factors for the isotropic transformation
+    sigma : int
+        sigma for the gaussian filter
+    pos_ref : int
+        position of the reference channel, starting from 0. This is not taken into account if the image is a single channel.
+    Returns
+    -------
+    norm_image : np.array
+        normalized and isotropic image
+    """
 
-#     if len(image.shape) > 3:  # if multichannel image
-#         nb_channels = image.shape[1]
-#         assert (
-#             pos_ref < nb_channels
-#         ), "The position of the reference channel is greater than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
-#         iso_image = []
-#         liste_channels = np.linspace(
-#             0, nb_channels - 1, nb_channels, dtype=int
-#         )
-#         for ch in liste_channels:
-#             channel = image[:, ch, :, :]
-#             (mask_iso, channel_iso, seg_iso) = change_arrays_pixelsize(
-#                 mask=mask,
-#                 image=channel,
-#                 labels=labels,
-#                 input_pixelsize=scale,
-#                 output_pixelsize=(1, 1, 1),
-#                 order=1,
-#                 n_jobs=-1,
-#             )
-#             iso_image.append(channel_iso)
+    if len(image.shape) > 3:  # if multichannel image
+        nb_channels = image.shape[1]
+        assert (
+            pos_ref < nb_channels
+        ), "The index of the reference channel should not bigger than the number of channels. Choose 0 if the first channel is the reference, 1 if the second channel is the reference, etc."
+        iso_image = []
+        liste_channels = np.linspace(
+            0, nb_channels - 1, nb_channels, dtype=int
+        )
+        for ch in liste_channels:
+            channel = image[:, ch, :, :]
+            channel_iso = change_array_pixelsize(
+                array=channel,
+                input_pixelsize=scale,
+                output_pixelsize=(1, 1, 1),
+                order=1,
+                n_jobs=-1,
+            )
+            iso_image.append(channel_iso)
 
-#         iso_image = np.array(iso_image)
-#         iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
+        iso_image = np.array(iso_image)
+        iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
+        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        ref_channel = iso_image[
+            :, pos_ref, :, :
+        ] 
+        liste_float_channels = np.delete(liste_channels, pos_ref)
+        norm_image = np.zeros_like(iso_image)
+        for ch_float in liste_float_channels:
+            channel = iso_image[:, ch_float, :, :]
+            channel_norm = normalize_intensity(
+                image=channel,
+                ref_image=ref_channel,
+                mask=mask_iso,
+                labels=seg_iso,
+                sigma=sigma,
+            )
+            
+            norm_image[:, ch_float, :, :] = channel_norm
+        ref_norm = normalize_intensity(image=ref_channel, ref_image=ref_channel, mask=mask_iso, labels=seg_iso, sigma=sigma)
+        norm_image[:, pos_ref, :, :] = ref_norm
 
-#         ref_channel = iso_image[
-#             :, pos_ref, :, :
-#         ]  # should check before if pos_ref>=iso_image.shape[1]
-#         liste_float_channels = np.delete(liste_channels, pos_ref)
-#         norm_image = np.zeros_like(iso_image)
-#         for ch_float in liste_float_channels:
-#             channel = iso_image[:, ch_float, :, :]
-#             channel_norm, ref_norm = normalize_intensity(
-#                 image=channel,
-#                 ref_image=ref_channel,
-#                 mask=mask_iso,
-#                 labels=seg_iso,
-#                 sigma=sigma,
-#             )
-#             norm_image[:, ch_float, :, :] = channel_norm
-#         norm_image[:, pos_ref, :, :] = ref_norm
+    else:  # 3D data, one channel
+        iso_image = change_array_pixelsize(
+            array=image,
+            labels=labels,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+        )
+        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        norm_image, _ = normalize_intensity(
+            image=iso_image,
+            ref_image=iso_image,
+            mask=mask_iso,
+            labels=seg_iso,
+            sigma=sigma,
+        )
 
-#     else:  # 3D data, one channel
-#         (mask_iso, iso_image, seg_iso) = change_arrays_pixelsize(
-#             mask=mask,
-#             image=image,
-#             labels=labels,
-#             reshape_factors=np.divide(scale, (1, 1, 1)),
-#         )
-#         norm_image, _ = normalize_intensity(
-#             image=iso_image,
-#             ref_image=iso_image,
-#             mask=mask_iso,
-#             labels=seg_iso,
-#             sigma=sigma,
-#         )
-
-#     return (mask_iso, norm_image, seg_iso)
+    return (norm_image, mask_iso, seg_iso)
 
 
 def change_array_pixelsize(
@@ -430,6 +434,70 @@ def compute_mask(
 
     return mask
 
+def global_image_equalization(
+    image: np.ndarray,
+    perc_low: float,
+    perc_high: float,
+    mask: np.ndarray = None,
+    n_jobs: int = -1,
+) -> np.ndarray:
+    
+    """
+    Performs global image equalization on either a single image or a temporal stack of images.
+    Stretches the image histogram by remapping intesities in the range [perc_low, perc_high] to the range [0, 1].
+    This helps to enhance the contrast and improve the visibility of structures in the image.
+
+    Parameters:
+    - image: numpy array, input image or temporal stack of images
+    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
+    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
+    - mask: numpy array, binary mask used to set the background to zero (optional)
+    - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
+
+    Returns:
+    - image_norm: numpy array, equalized image or stack of equalized images
+    """
+
+    is_temporal = image.ndim == 4
+
+    if is_temporal:
+        # apply percentile function along first axis
+        perc_low, perc_high = np.nanpercentile(
+            image, 
+            q=[perc_low, perc_high], 
+            axis=(1,2,3),
+            keepdims=True
+        )
+    else:
+        perc_low, perc_high = np.nanpercentile(image, [perc_low, perc_high])
+
+    image_norm = (image - perc_low) / (perc_high - perc_low + 1e-8)
+
+    if not(mask is None):
+        image_norm = np.where(mask, image_norm, 0.0)
+
+    return np.clip(image_norm, 0, 1)
+    
+def _local_equalization_parallel(
+    tuple_input: tuple[np.ndarray, np.ndarray],
+    box_size: int,
+    perc_low: float,
+    perc_high: float,
+) -> np.ndarray:
+
+    image, mask = tuple_input
+
+    image_norm = _local_equalization(
+        image,
+        box_size=box_size,
+        perc_low=perc_low,
+        perc_high=perc_high,
+        mask=mask,
+    )
+
+    return image_norm
+
+        
 
 def local_image_equalization(
     image: np.ndarray,
@@ -448,8 +516,8 @@ def local_image_equalization(
     Parameters:
     - image: numpy array, input image or temporal stack of images
     - box_size: int, size of the local neighborhood for equalization
-    - perc_low: float, lower percentile for intensity equalization
-    - perc_high: float, upper percentile for intensity equalization
+    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
+    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
     - mask: numpy array, binary mask used to set the background to zero (optional)
     - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
@@ -465,21 +533,35 @@ def local_image_equalization(
         if mask_is_None:
             mask = [None] * image.shape[0]
 
-        # Apply local equalization to each time frame in the temporal stack
-        image_norm = np.array(
-            [
-                _local_equalization(
-                    image[ind_t],
-                    box_size=box_size,
-                    perc_low=perc_low,
-                    perc_high=perc_high,
-                    mask=mask[ind_t],
-                )
-                for ind_t in tqdm(
-                    range(image.shape[0]), desc="Local equalization"
+        func_parallel = partial(
+            _local_equalization_parallel,
+            box_size=box_size,
+            perc_low=perc_low,
+            perc_high=perc_high,
+        )
+
+        if n_jobs == 1:
+            # Sequential processing
+            image_norm = [
+                func_parallel(im, mask=ma)
+                for im, ma in tqdm(
+                    zip(image, mask), desc="Local equalization", total=image.shape[0]
                 )
             ]
-        )
+
+        else:
+            # Parallel processing
+            max_workers = (
+                cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+            )
+
+            image_norm = process_map(
+                func_parallel,
+                zip(image, mask),
+                max_workers=max_workers,
+                desc="Local equalization",
+                total=image.shape[0],
+            )
     else:
         # Apply local equalization to the image
         image_norm = _local_equalization(
@@ -633,6 +715,11 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
+    from stardist import gputools_available
+    
+    if gputools_available():
+        _purge_gpu_memory()
+
     return labels
 
 
@@ -645,7 +732,7 @@ def segment_stardist_from_files(
 
     model = _load_model(func_params["model_path"])
 
-    for file in image_files:
+    for index, file in enumerate(image_files):
         image = tifffile.imread(file)
         labels = _segment_stardist(
             image,
@@ -653,8 +740,13 @@ def segment_stardist_from_files(
             thresholds_dict=func_params.get("thresholds_dict"),
         )
         tifffile.imwrite(
-            f"{path_to_save}/segmented_{file}", labels, **compress_params
+            f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
         )
+
+    from stardist import gputools_available
+    
+    if gputools_available():
+        _purge_gpu_memory()
 
 
 def align_array_major_axis(
