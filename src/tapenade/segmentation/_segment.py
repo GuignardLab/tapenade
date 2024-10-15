@@ -28,7 +28,7 @@ def predict_stardist(
     assert len(np.shape(array)) <= 3
 
     data = change_array_pixelsize(
-        image=array,
+        array=array,
         input_pixelsize=input_voxelsize,
         output_pixelsize=voxelsize_model,
         order=1,
