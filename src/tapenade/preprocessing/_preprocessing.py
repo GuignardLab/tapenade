@@ -18,7 +18,11 @@ from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
 from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._segmentation import _load_model, _segment_stardist, _purge_gpu_memory
+from tapenade.preprocessing._segmentation import (
+    _load_model,
+    _segment_stardist,
+    _purge_gpu_memory,
+)
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse,
@@ -45,7 +49,7 @@ In typical order:
 
 
 def isotropize_and_normalize(
-    image , mask, labels, scale, sigma: float = None, pos_ref: int = 0
+    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0
 ):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
@@ -92,11 +96,19 @@ def isotropize_and_normalize(
 
         iso_image = np.array(iso_image)
         iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
-        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
-        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
-        ref_channel = iso_image[
-            :, pos_ref, :, :
-        ] 
+        mask_iso = change_array_pixelsize(
+            array=mask,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
+        seg_iso = change_array_pixelsize(
+            array=labels,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
+        ref_channel = iso_image[:, pos_ref, :, :]
         liste_float_channels = np.delete(liste_channels, pos_ref)
         norm_image = np.zeros_like(iso_image)
         for ch_float in liste_float_channels:
@@ -108,9 +120,15 @@ def isotropize_and_normalize(
                 labels=seg_iso,
                 sigma=sigma,
             )
-            
+
             norm_image[:, ch_float, :, :] = channel_norm
-        ref_norm = normalize_intensity(image=ref_channel, ref_image=ref_channel, mask=mask_iso, labels=seg_iso, sigma=sigma)
+        ref_norm = normalize_intensity(
+            image=ref_channel,
+            ref_image=ref_channel,
+            mask=mask_iso,
+            labels=seg_iso,
+            sigma=sigma,
+        )
         norm_image[:, pos_ref, :, :] = ref_norm
 
     else:  # 3D data, one channel
@@ -120,8 +138,18 @@ def isotropize_and_normalize(
             input_pixelsize=scale,
             output_pixelsize=(1, 1, 1),
         )
-        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
-        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        mask_iso = change_array_pixelsize(
+            array=mask,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
+        seg_iso = change_array_pixelsize(
+            array=labels,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
         norm_image, _ = normalize_intensity(
             image=iso_image,
             ref_image=iso_image,
@@ -203,18 +231,18 @@ def change_array_pixelsize(
             order=order,
         )
 
-    return resized_array
+    return np.array(resized_array)
 
 
-def reorganize_array_dimension(
+def reorganize_array_dimensions(
     array: np.ndarray,
-    nb_channels: str = None,
-    nb_depth: str = None,
-    nb_Y: str = None,
-    nb_X: str = None,
-    nb_timepoints: str = None,
+    nb_channels: int = None,
+    nb_timepoints: int = None,
+    nb_depth: int = None,
+    nb_Y: int = None,
+    nb_X: int = None,
     bool_seperate_channels: bool = False,
-    shape_as_string: str = "",
+    dimensions_as_string: str = None,
 ) -> list:
     """
     Take a stack that can be 3D, 4D (TZYX or CZYX) or 5D (CTZYX)  and re-organize it in CTZYX convention.
@@ -226,66 +254,68 @@ def reorganize_array_dimension(
         array to transpose and split
     nb_channels : int
         number of channels
+    nb_timepoints : int
+        number of timepoints if this is a time sequence
     nb_depth : int
-        number of pixels in the z dimension
+        number of pixels in the Z dimension
     nb_Y : int
         number of pixels in Y
     nb_X : int
         number of pixels in X
-    nb_timepoints : int
-        number of timepoints if this is a time sequence
     bool_seperate_channels : bool
-        if True, the channels will be split
-    shape_as_string : str
-        To run as batch, possility to give direclty the order of the dimensions as a string. For example 'CTZYX' or 'XYZ'. The letters have to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed. Every letter can be included only once.
+        if True, the channels will be split and the output will be a list of arrays
+    dimensions_as_string : str
+        To run as batch, possility to give directly the order of the dimensions as a string. For example 'CTZYX' or 'XYZ'.
+        The letters have to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed.
+        Every letter can be included only once.
         If this is not 'None', the parameters nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints are not taken into account.
     Returns
     -------
-    output_list : list
+    output_list : list or np.array
         list of arrays in CTZYX convention
-
     """
-    output_list = []  # output is a list of arrays
 
-    if shape_as_string != "None":
-        check(len(shape_as_string)).equals(array.ndim).or_raise(
+    if dimensions_as_string is not None:
+        check(len(dimensions_as_string)).equals(array.ndim).or_raise(
             Exception,
             "The number of dimensions is incorrect. \n",
         )
 
-        sorted_axes = str("".join(sorted(shape_as_string)))
+        sorted_axes = str("".join(sorted(dimensions_as_string)))
         check(["CTXYZ", "CXYZ", "TXYZ", "XYZ", "XY"]).contains(
             sorted_axes
         ).or_raise(
             Exception,
-            "The letters you choose has to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed. Every letter can be included only once.",
+            "The letters you choose have to be among these letters : X,Y,Z,C,T, with XY mandatory\n"
+            "No other letters are allowed. Every letter can be included only once.",
         )
 
         # Indices des dimensions X, Y, C, T et Z
-        ind_X, ind_Y = shape_as_string.find("X"), shape_as_string.find("Y")
+        ind_X, ind_Y = dimensions_as_string.find("X"), dimensions_as_string.find("Y")
         size_C, size_T, size_Z = 1, 1, 1  # Defaults
 
-        if "C" in shape_as_string:
-            ind_C = shape_as_string.find("C")
+        if "C" in dimensions_as_string:
+            ind_C = dimensions_as_string.find("C")
             size_C = array.shape[ind_C]
-        if "T" in shape_as_string:
-            ind_T = shape_as_string.find("T")
+        if "T" in dimensions_as_string:
+            ind_T = dimensions_as_string.find("T")
             size_T = array.shape[ind_T]
-        if "Z" in shape_as_string:
-            ind_Z = shape_as_string.find("Z")
+        if "Z" in dimensions_as_string:
+            ind_Z = dimensions_as_string.find("Z")
             size_Z = array.shape[ind_Z]
 
-    else:  # if the shape is not given in the parameter shape_as_string, then we have to find the index of each dimension
+    else:  # if the shape is not given in the parameter dimensions_as_string, then we have to find the index of each dimension
         str_shape = [str(i) for i in np.shape(array)]
         list_selected_dimensions = [
-            nb_channels,
-            nb_depth,
-            nb_Y,
-            nb_X,
-            nb_timepoints,
+            str(nb_channels),
+            str(nb_depth),
+            str(nb_Y),
+            str(nb_X),
+            str(nb_timepoints),
         ]
 
-        # we add a suffix to the elements that are present more than once, to make sure we recover individually the index of each dimension (str.index() returns the first occurence)
+        # we add a suffix to the elements that are present more than once, to make sure we recover individually
+        # the index of each dimension (str.index() returns the first occurence)
         def add_suffix_if_duplicate(lst):
             for elem in lst:
                 if lst.count(elem) > 1:
@@ -308,18 +338,18 @@ def reorganize_array_dimension(
         ind_X = str_shape.index(str(nb_X))
 
         (size_T, ind_T) = (
-            (int(nb_timepoints.split('_')[0]), str_shape.index(nb_timepoints))
-            if nb_timepoints != "None"
+            (int(nb_timepoints.split("_")[0]), str_shape.index(nb_timepoints))
+            if nb_timepoints is not None
             else (1, None)
         )
         (size_C, ind_C) = (
-            (int(nb_channels.split('_')[0]), str_shape.index(nb_channels))
-            if nb_channels != "None"
+            (int(nb_channels.split("_")[0]), str_shape.index(nb_channels))
+            if nb_channels is not None
             else (1, None)
         )
         (size_Z, ind_Z) = (
-             (int(nb_depth.split('_')[0]), str_shape.index(nb_depth))
-            if nb_depth != "None"
+            (int(nb_depth.split("_")[0]), str_shape.index(nb_depth))
+            if nb_depth is not None
             else (1, None)
         )
 
@@ -329,30 +359,27 @@ def reorganize_array_dimension(
             array, (ind_C, ind_T, ind_Z, ind_Y, ind_X)
         )
     elif size_Z > 1 and size_T > 1 and size_C == 1:  # TZYX
-        output_list.append(np.transpose(array, (ind_T, ind_Z, ind_Y, ind_X)))
+        array_transposed = np.transpose(array, (ind_T, ind_Z, ind_Y, ind_X))
     elif size_Z > 1 and size_T == 1 and size_C > 1:  # CZYX
         array_transposed = np.transpose(array, (ind_C, ind_Z, ind_Y, ind_X))
     elif (
         size_Z > 1 and size_T == 1 and size_C == 1
     ):  # 3D data no channel no timepoint
-        output_list.append(np.transpose(array, (ind_Z, ind_Y, ind_X)))
+        array_transposed = np.transpose(array, (ind_Z, ind_Y, ind_X))
     elif size_Z == 1 and size_T > 1 and size_C > 1:
         array_transposed = np.transpose(array, (ind_C, ind_T, ind_Y, ind_X))
     elif size_Z == 1 and size_T > 1 and size_C == 1:  # TZYX
-        output_list.append(np.transpose(array, (ind_T, ind_Y, ind_X)))
+        array_transposed = np.transpose(array, (ind_T, ind_Y, ind_X))
     elif size_Z == 1 and size_T == 1 and size_C > 1:  # CZYX
         array_transposed = np.transpose(array, (ind_C, ind_Y, ind_X))
-    else:  # 2D data no channel no timepoint
-        output_list.append(array)
+    # else data is 2D
 
     if bool_seperate_channels and size_C > 1:
-        # Ajouter chaque canal séparément à la liste de sortie
-        output_list = [array_transposed[c] for c in range(size_C)]
+        # return list of arrays, one for each channel
+        return list(array_transposed)
     else:
-        # Ajouter tout l'array transposé comme un seul élément
-        output_list.append(array_transposed)
+        return array_transposed
 
-    return output_list
 
 
 def compute_mask(
@@ -412,13 +439,11 @@ def compute_mask(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            mask = np.array(
-                process_map(
-                    func_parallel,
-                    image,
-                    max_workers=max_workers,
-                    desc="Thresholding image",
-                )
+            mask = process_map(
+                func_parallel,
+                image,
+                max_workers=max_workers,
+                desc="Thresholding image",
             )
     else:
         # Single image processing
@@ -432,7 +457,8 @@ def compute_mask(
             registered_image=registered_image,
         )
 
-    return mask
+    return np.array(mask)
+
 
 def global_image_equalization(
     image: np.ndarray,
@@ -441,7 +467,6 @@ def global_image_equalization(
     mask: np.ndarray = None,
     n_jobs: int = -1,
 ) -> np.ndarray:
-    
     """
     Performs global image equalization on either a single image or a temporal stack of images.
     Stretches the image histogram by remapping intesities in the range [perc_low, perc_high] to the range [0, 1].
@@ -463,21 +488,19 @@ def global_image_equalization(
     if is_temporal:
         # apply percentile function along first axis
         perc_low, perc_high = np.nanpercentile(
-            image, 
-            q=[perc_low, perc_high], 
-            axis=(1,2,3),
-            keepdims=True
+            image, q=[perc_low, perc_high], axis=(1, 2, 3), keepdims=True
         )
     else:
         perc_low, perc_high = np.nanpercentile(image, [perc_low, perc_high])
 
     image_norm = (image - perc_low) / (perc_high - perc_low + 1e-8)
 
-    if not(mask is None):
+    if not (mask is None):
         image_norm = np.where(mask, image_norm, 0.0)
 
     return np.clip(image_norm, 0, 1)
-    
+
+
 def _local_equalization_parallel(
     tuple_input: tuple[np.ndarray, np.ndarray],
     box_size: int,
@@ -497,7 +520,6 @@ def _local_equalization_parallel(
 
     return image_norm
 
-        
 
 def local_image_equalization(
     image: np.ndarray,
@@ -545,7 +567,9 @@ def local_image_equalization(
             image_norm = [
                 func_parallel(im, mask=ma)
                 for im, ma in tqdm(
-                    zip(image, mask), desc="Local equalization", total=image.shape[0]
+                    zip(image, mask),
+                    desc="Local equalization",
+                    total=image.shape[0],
                 )
             ]
 
@@ -555,13 +579,13 @@ def local_image_equalization(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            image_norm = process_map(
+            image_norm = np.array(process_map(
                 func_parallel,
                 zip(image, mask),
                 max_workers=max_workers,
                 desc="Local equalization",
                 total=image.shape[0],
-            )
+            ))
     else:
         # Apply local equalization to the image
         image_norm = _local_equalization(
@@ -576,7 +600,7 @@ def local_image_equalization(
         # Set the background to zero using the mask
         image_norm = np.where(mask, image_norm, 0.0)
 
-    return np.clip(image_norm, 0, 1)
+    return np.clip(np.array(image_norm), 0, 1)
 
 
 def normalize_intensity(
@@ -716,7 +740,7 @@ def segment_stardist(
         )
 
     from stardist import gputools_available
-    
+
     if gputools_available():
         _purge_gpu_memory()
 
@@ -744,7 +768,7 @@ def segment_stardist_from_files(
         )
 
     from stardist import gputools_available
-    
+
     if gputools_available():
         _purge_gpu_memory()
 
