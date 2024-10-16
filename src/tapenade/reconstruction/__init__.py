@@ -18,7 +18,7 @@ __all__ = (
     "extract_positions",
     "plot_positions",
     "associate_positions",
-    "transformation_from_plugin"
+    "transformation_from_plugin",
     "manual_registration_fct",
     "register",
     "create_folders",
