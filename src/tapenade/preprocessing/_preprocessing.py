@@ -243,6 +243,7 @@ def reorganize_array_dimensions(
     nb_X: int = None,
     bool_seperate_channels: bool = False,
     dimensions_as_string: str = None,
+    n_jobs: int = -1,
 ) -> list:
     """
     Take a stack that can be 3D, 4D (TZYX or CZYX) or 5D (CTZYX)  and re-organize it in CTZYX convention.
@@ -269,6 +270,10 @@ def reorganize_array_dimensions(
         The letters have to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed.
         Every letter can be included only once.
         If this is not 'None', the parameters nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints are not taken into account.
+    n_jobs : int
+        Not used here. Kept for consistency with other functions.
+
+
     Returns
     -------
     output_list : list or np.array
@@ -380,7 +385,73 @@ def reorganize_array_dimensions(
     else:
         return array_transposed
 
+def _load_reorganize_and_save_to_file(
+    array_file: str,
+    index: int,
+    output_folders: str,
+    bool_seperate_channels: bool,
+    dimensions_as_string: str,
+    compress_params: dict,
+):
+    array = tifffile.imread(array_file)
 
+    #array_result is either a list of arrays or a single array
+    array_result = reorganize_array_dimensions(
+        array,
+        bool_seperate_channels=bool_seperate_channels,
+        dimensions_as_string=dimensions_as_string,
+    )
+
+    if bool_seperate_channels:
+        # save each channel to a separate folder
+        for index, (array_channel, output_folder) in enumerate(zip(array_result, output_folders)):
+            tifffile.imwrite(
+                f"{output_folder}/{array_file}_ch{index:>02}",
+                array_channel,
+                **compress_params
+            )
+    else:
+        tifffile.imwrite(
+            f"{output_folders}/{array_file}",
+            array_result,
+            **compress_params
+        )
+
+
+
+def reorganize_array_dimensions_from_files(
+    array_files: list[str], 
+    output_folders: Union[list[str], str], 
+    compress_params: dict, 
+    func_params: dict
+):
+    """
+    Reorganize the dimensions of a list of arrays and save them to files.
+    """
+
+    multithreaded_function = partial(
+        _load_reorganize_and_save_to_file,
+        output_folders=output_folders,
+        compress_params=compress_params,
+        bool_seperate_channels=func_params["bool_seperate_channels"],
+        dimensions_as_string=func_params["dimensions_as_string"],
+    )
+
+    n_jobs = func_params["n_jobs"]
+
+    # open all array files using the multithreading library and reorganize the dimensions
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        tqdm(
+            executor.map(
+                multithreaded_function,
+                array_files,
+                range(len(array_files)),
+            ),
+            total=len(array_files),
+            desc="Reorganizing array",
+        )
+
+    
 
 def compute_mask(
     image: np.ndarray,
@@ -947,7 +1018,7 @@ def align_array_major_axis_from_files(
         compress_params=compress_params,
     )
 
-    n_jobs = func_params.get("n_jobs", -1)
+    n_jobs = func_params["n_jobs"]
 
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
@@ -1052,7 +1123,7 @@ def crop_array_using_mask_from_files(
     # open all mask files using the multithreading library
     mask_slices = []
 
-    n_jobs = func_params.get("n_jobs", -1)
+    n_jobs = func_params["n_jobs"]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
         mask_slices = list(
