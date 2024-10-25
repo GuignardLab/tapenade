@@ -97,13 +97,13 @@ Though not mandatory, we also recommend running the inference with StarDist3D on
 
 The methods described above are available at the following locations:
 
-1. **Spectral filtering**: [Code](src/tapenade/preprocessing/spectral_filtering/XXX), [Notebook](tapenade/notebooks/spectral_filtering_notebook.ipynb)
-2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](tapenade/notebooks/registration_notebook.ipynb)
-3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](tapenade/notebooks/preprocessing_notebook.ipynb)
-4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](tapenade/notebooks/segmentation_notebook.ipynb)
-4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](tapenade/notebooks/masked_gaussian_smoothing_notebook.ipynb)
-5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](tapenade/notebooks/spatial_correlation_analysis_notebook.ipynb)
-6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](tapenade/notebooks/deformation_analysis_notebook.ipynb)
+1. **Spectral filtering**: [Code](src/tapenade/preprocessing/spectral_filtering/XXX), [Notebook](notebooks/spectral_filtering_notebook.ipynb)
+2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](notebooks/registration_notebook.ipynb)
+3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](notebooks/preprocessing_notebook.ipynb)
+4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](notebooks/segmentation_notebook.ipynb)
+4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](notebooks/masked_gaussian_smoothing_notebook.ipynb)
+5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](notebooks/spatial_correlation_analysis_notebook.ipynb)
+6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](notebooks/deformation_analysis_notebook.ipynb)
 
 All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
 
