@@ -2,7 +2,7 @@ import numpy as np
 from skimage.transform import resize
 from tqdm import tqdm
 
-from tapenade.preprocessing import change_arrays_pixelsize, segment_stardist
+from tapenade.preprocessing import change_array_pixelsize, segment_stardist
 
 
 def predict_stardist(
@@ -27,8 +27,8 @@ def predict_stardist(
     """
     assert len(np.shape(array)) <= 3
 
-    data = change_arrays_pixelsize(
-        image=array,
+    data = change_array_pixelsize(
+        array=array,
         input_pixelsize=input_voxelsize,
         output_pixelsize=voxelsize_model,
         order=1,
