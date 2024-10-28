@@ -5,11 +5,12 @@ from typing import Optional, Union
 
 import numpy as np
 import tifffile
+from ensure import check
 from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
-from ensure import check
+
 from tapenade.preprocessing._array_rescaling import _change_array_pixelsize
 from tapenade.preprocessing._axis_alignment import (
     _compute_rotation_angle_and_indices,
@@ -20,8 +21,8 @@ from tapenade.preprocessing._intensity_normalization import (
 from tapenade.preprocessing._local_equalization import _local_equalization
 from tapenade.preprocessing._segmentation import (
     _load_model,
-    _segment_stardist,
     _purge_gpu_memory,
+    _segment_stardist,
 )
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
@@ -295,7 +296,9 @@ def reorganize_array_dimensions(
         )
 
         # Indices des dimensions X, Y, C, T et Z
-        ind_X, ind_Y = dimensions_as_string.find("X"), dimensions_as_string.find("Y")
+        ind_X, ind_Y = dimensions_as_string.find(
+            "X"
+        ), dimensions_as_string.find("Y")
         size_C, size_T, size_Z = 1, 1, 1  # Defaults
 
         if "C" in dimensions_as_string:
@@ -384,6 +387,7 @@ def reorganize_array_dimensions(
     else:
         return array_transposed
 
+
 def _load_reorganize_and_save_to_file(
     array_file: str,
     index: int,
@@ -394,7 +398,7 @@ def _load_reorganize_and_save_to_file(
 ):
     array = tifffile.imread(array_file)
 
-    #array_result is either a list of arrays or a single array
+    # array_result is either a list of arrays or a single array
     array_result = reorganize_array_dimensions(
         array,
         bool_seperate_channels=bool_seperate_channels,
@@ -403,26 +407,25 @@ def _load_reorganize_and_save_to_file(
 
     if bool_seperate_channels:
         # save each channel to a separate folder
-        for index, (array_channel, output_folder) in enumerate(zip(array_result, output_folders)):
+        for index, (array_channel, output_folder) in enumerate(
+            zip(array_result, output_folders, strict=False)
+        ):
             tifffile.imwrite(
                 f"{output_folder}/{array_file}_ch{index:>02}",
                 array_channel,
-                **compress_params
+                **compress_params,
             )
     else:
         tifffile.imwrite(
-            f"{output_folders}/{array_file}",
-            array_result,
-            **compress_params
+            f"{output_folders}/{array_file}", array_result, **compress_params
         )
 
 
-
 def reorganize_array_dimensions_from_files(
-    array_files: list[str], 
-    output_folders: Union[list[str], str], 
-    compress_params: dict, 
-    func_params: dict
+    array_files: list[str],
+    output_folders: Union[list[str], str],
+    compress_params: dict,
+    func_params: dict,
 ):
     """
     Reorganize the dimensions of a list of arrays and save them to files.
@@ -450,7 +453,6 @@ def reorganize_array_dimensions_from_files(
             desc="Reorganizing array",
         )
 
-    
 
 def compute_mask(
     image: np.ndarray,
@@ -565,7 +567,7 @@ def global_image_equalization(
 
     image_norm = (image - perc_low) / (perc_high - perc_low + 1e-8)
 
-    if not (mask is None):
+    if mask is not None:
         image_norm = np.where(mask, image_norm, 0.0)
 
     return np.clip(image_norm, 0, 1)
@@ -637,7 +639,7 @@ def local_image_equalization(
             image_norm = [
                 func_parallel(im, mask=ma)
                 for im, ma in tqdm(
-                    zip(image, mask),
+                    zip(image, mask, strict=False),
                     desc="Local equalization",
                     total=image.shape[0],
                 )
@@ -649,13 +651,15 @@ def local_image_equalization(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            image_norm = np.array(process_map(
-                func_parallel,
-                zip(image, mask),
-                max_workers=max_workers,
-                desc="Local equalization",
-                total=image.shape[0],
-            ))
+            image_norm = np.array(
+                process_map(
+                    func_parallel,
+                    zip(image, mask, strict=False),
+                    max_workers=max_workers,
+                    desc="Local equalization",
+                    total=image.shape[0],
+                )
+            )
     else:
         # Apply local equalization to the image
         image_norm = _local_equalization(
