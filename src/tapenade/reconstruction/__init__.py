@@ -5,6 +5,7 @@ from ._reconstruct import (
     create_folders,
     extract_positions,
     fuse_sides,
+    fuse_sides_in_z_axis,
     transformation_from_plugin,
     manual_registration_fct,
     plot_positions,
@@ -12,6 +13,7 @@ from ._reconstruct import (
     remove_previous_files,
     sigmoid,
     write_hyperstacks,
+    compute_transformation_from_trsf_files,
 )
 
 __all__ = (
@@ -24,8 +26,10 @@ __all__ = (
     "create_folders",
     "check_napari",
     "fuse_sides",
+    "fuse_sides_in_z_axis",
     "sigmoid",
     "write_hyperstacks",
     "add_centermass",
     "remove_previous_files",
+    "compute_transformation_from_trsf_files",
 )
