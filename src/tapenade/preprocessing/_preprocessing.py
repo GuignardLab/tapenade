@@ -116,7 +116,6 @@ def isotropize_and_normalize(
     else:  # 3D data, one channel
         iso_image = change_array_pixelsize(
             array=image,
-            labels=labels,
             input_pixelsize=scale,
             output_pixelsize=(1, 1, 1),
         )
