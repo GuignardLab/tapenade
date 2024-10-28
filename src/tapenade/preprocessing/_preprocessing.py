@@ -5,6 +5,7 @@ from typing import Optional, Union
 
 import numpy as np
 import tifffile
+from ensure import check
 from scipy.ndimage import rotate
 from skimage.measure import regionprops
 from tqdm import tqdm
@@ -18,7 +19,11 @@ from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
 from tapenade.preprocessing._local_equalization import _local_equalization
-from tapenade.preprocessing._segmentation import _load_model, _segment_stardist, _purge_gpu_memory
+from tapenade.preprocessing._segmentation import (
+    _load_model,
+    _purge_gpu_memory,
+    _segment_stardist,
+)
 from tapenade.preprocessing._smoothing import (
     _masked_smooth_gaussian,
     _masked_smooth_gaussian_sparse,
@@ -45,7 +50,7 @@ In typical order:
 
 
 def isotropize_and_normalize(
-    image , mask, labels, scale, sigma: float = None, pos_ref: int = 0
+    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0
 ):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
@@ -92,11 +97,19 @@ def isotropize_and_normalize(
 
         iso_image = np.array(iso_image)
         iso_image = iso_image.transpose(1, 0, 2, 3)  # stay in convention ZCYX
-        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
-        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
-        ref_channel = iso_image[
-            :, pos_ref, :, :
-        ] 
+        mask_iso = change_array_pixelsize(
+            array=mask,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
+        seg_iso = change_array_pixelsize(
+            array=labels,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
+        ref_channel = iso_image[:, pos_ref, :, :]
         liste_float_channels = np.delete(liste_channels, pos_ref)
         norm_image = np.zeros_like(iso_image)
         for ch_float in liste_float_channels:
@@ -108,9 +121,15 @@ def isotropize_and_normalize(
                 labels=seg_iso,
                 sigma=sigma,
             )
-            
+
             norm_image[:, ch_float, :, :] = channel_norm
-        ref_norm = normalize_intensity(image=ref_channel, ref_image=ref_channel, mask=mask_iso, labels=seg_iso, sigma=sigma)
+        ref_norm = normalize_intensity(
+            image=ref_channel,
+            ref_image=ref_channel,
+            mask=mask_iso,
+            labels=seg_iso,
+            sigma=sigma,
+        )
         norm_image[:, pos_ref, :, :] = ref_norm
 
     else:  # 3D data, one channel
@@ -119,8 +138,18 @@ def isotropize_and_normalize(
             input_pixelsize=scale,
             output_pixelsize=(1, 1, 1),
         )
-        mask_iso = change_array_pixelsize(array=mask, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
-        seg_iso = change_array_pixelsize(array=labels, input_pixelsize=scale, output_pixelsize=(1, 1, 1), order=0)
+        mask_iso = change_array_pixelsize(
+            array=mask,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
+        seg_iso = change_array_pixelsize(
+            array=labels,
+            input_pixelsize=scale,
+            output_pixelsize=(1, 1, 1),
+            order=0,
+        )
         norm_image, _ = normalize_intensity(
             image=iso_image,
             ref_image=iso_image,
@@ -202,7 +231,227 @@ def change_array_pixelsize(
             order=order,
         )
 
-    return resized_array
+    return np.array(resized_array)
+
+
+def reorganize_array_dimensions(
+    array: np.ndarray,
+    nb_channels: int = None,
+    nb_timepoints: int = None,
+    nb_depth: int = None,
+    nb_Y: int = None,
+    nb_X: int = None,
+    bool_seperate_channels: bool = False,
+    dimensions_as_string: str = None,
+    n_jobs: int = -1,
+) -> list:
+    """
+    Take a stack that can be 3D, 4D (TZYX or CZYX) or 5D (CTZYX)  and re-organize it in CTZYX convention.
+    Possibility to split the channels if it is a multichannel array, in order to apply the pipeline functions on the separated channels.
+    In that case the output is a list of the different channels
+    Parameters
+    ----------
+    array : np.array
+        array to transpose and split
+    nb_channels : int
+        number of channels
+    nb_timepoints : int
+        number of timepoints if this is a time sequence
+    nb_depth : int
+        number of pixels in the Z dimension
+    nb_Y : int
+        number of pixels in Y
+    nb_X : int
+        number of pixels in X
+    bool_seperate_channels : bool
+        if True, the channels will be split and the output will be a list of arrays
+    dimensions_as_string : str
+        To run as batch, possility to give directly the order of the dimensions as a string. For example 'CTZYX' or 'XYZ'.
+        The letters have to be among these letters : X,Y,Z,C,T, with XY mandatory, and no other letters are allowed.
+        Every letter can be included only once.
+        If this is not 'None', the parameters nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints are not taken into account.
+    n_jobs : int
+        Not used here. Kept for consistency with other functions.
+
+
+    Returns
+    -------
+    output_list : list or np.array
+        list of arrays in CTZYX convention
+    """
+
+    if dimensions_as_string is not None:
+        check(len(dimensions_as_string)).equals(array.ndim).or_raise(
+            Exception,
+            "The number of dimensions is incorrect. \n",
+        )
+
+        sorted_axes = str("".join(sorted(dimensions_as_string)))
+        check(["CTXYZ", "CXYZ", "TXYZ", "XYZ", "XY"]).contains(
+            sorted_axes
+        ).or_raise(
+            Exception,
+            "The letters you choose have to be among these letters : X,Y,Z,C,T, with XY mandatory\n"
+            "No other letters are allowed. Every letter can be included only once.",
+        )
+
+        # Indices des dimensions X, Y, C, T et Z
+        ind_X, ind_Y = dimensions_as_string.find(
+            "X"
+        ), dimensions_as_string.find("Y")
+        size_C, size_T, size_Z = 1, 1, 1  # Defaults
+
+        if "C" in dimensions_as_string:
+            ind_C = dimensions_as_string.find("C")
+            size_C = array.shape[ind_C]
+        if "T" in dimensions_as_string:
+            ind_T = dimensions_as_string.find("T")
+            size_T = array.shape[ind_T]
+        if "Z" in dimensions_as_string:
+            ind_Z = dimensions_as_string.find("Z")
+            size_Z = array.shape[ind_Z]
+
+    else:  # if the shape is not given in the parameter dimensions_as_string, then we have to find the index of each dimension
+        str_shape = [str(i) for i in np.shape(array)]
+        list_selected_dimensions = [
+            str(nb_channels),
+            str(nb_depth),
+            str(nb_Y),
+            str(nb_X),
+            str(nb_timepoints),
+        ]
+
+        # we add a suffix to the elements that are present more than once, to make sure we recover individually
+        # the index of each dimension (str.index() returns the first occurence)
+        def add_suffix_if_duplicate(lst):
+            for elem in lst:
+                if lst.count(elem) > 1:
+                    for idx, val in enumerate(
+                        [i for i, j in enumerate(lst) if j == elem]
+                    ):
+                        lst[val] = f"{lst[val]}_occurrence{idx + 1}"
+            return lst
+
+        str_shape = add_suffix_if_duplicate(str_shape)
+        list_selected_dimensions = add_suffix_if_duplicate(
+            list_selected_dimensions
+        )
+        (nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints) = (
+            list_selected_dimensions
+        )
+
+        # to find the index of each dimension we compare the shape of the array with the number selected. This is done comparing string.
+        ind_Y = str_shape.index(str(nb_Y))
+        ind_X = str_shape.index(str(nb_X))
+
+        (size_T, ind_T) = (
+            (int(nb_timepoints.split("_")[0]), str_shape.index(nb_timepoints))
+            if nb_timepoints is not None
+            else (1, None)
+        )
+        (size_C, ind_C) = (
+            (int(nb_channels.split("_")[0]), str_shape.index(nb_channels))
+            if nb_channels is not None
+            else (1, None)
+        )
+        (size_Z, ind_Z) = (
+            (int(nb_depth.split("_")[0]), str_shape.index(nb_depth))
+            if nb_depth is not None
+            else (1, None)
+        )
+
+    # for each possibility, we transpose the array in the convention CTZYX and split it into channels if bool_seperate_channels is True
+    if size_Z > 1 and size_T > 1 and size_C > 1:
+        array_transposed = np.transpose(
+            array, (ind_C, ind_T, ind_Z, ind_Y, ind_X)
+        )
+    elif size_Z > 1 and size_T > 1 and size_C == 1:  # TZYX
+        array_transposed = np.transpose(array, (ind_T, ind_Z, ind_Y, ind_X))
+    elif size_Z > 1 and size_T == 1 and size_C > 1:  # CZYX
+        array_transposed = np.transpose(array, (ind_C, ind_Z, ind_Y, ind_X))
+    elif (
+        size_Z > 1 and size_T == 1 and size_C == 1
+    ):  # 3D data no channel no timepoint
+        array_transposed = np.transpose(array, (ind_Z, ind_Y, ind_X))
+    elif size_Z == 1 and size_T > 1 and size_C > 1:
+        array_transposed = np.transpose(array, (ind_C, ind_T, ind_Y, ind_X))
+    elif size_Z == 1 and size_T > 1 and size_C == 1:  # TZYX
+        array_transposed = np.transpose(array, (ind_T, ind_Y, ind_X))
+    elif size_Z == 1 and size_T == 1 and size_C > 1:  # CZYX
+        array_transposed = np.transpose(array, (ind_C, ind_Y, ind_X))
+    # else data is 2D
+
+    if bool_seperate_channels and size_C > 1:
+        # return list of arrays, one for each channel
+        return list(array_transposed)
+    else:
+        return array_transposed
+
+
+def _load_reorganize_and_save_to_file(
+    array_file: str,
+    index: int,
+    output_folders: str,
+    bool_seperate_channels: bool,
+    dimensions_as_string: str,
+    compress_params: dict,
+):
+    array = tifffile.imread(array_file)
+
+    # array_result is either a list of arrays or a single array
+    array_result = reorganize_array_dimensions(
+        array,
+        bool_seperate_channels=bool_seperate_channels,
+        dimensions_as_string=dimensions_as_string,
+    )
+
+    if bool_seperate_channels:
+        # save each channel to a separate folder
+        for index, (array_channel, output_folder) in enumerate(
+            zip(array_result, output_folders, strict=False)
+        ):
+            tifffile.imwrite(
+                f"{output_folder}/{array_file}_ch{index:>02}",
+                array_channel,
+                **compress_params,
+            )
+    else:
+        tifffile.imwrite(
+            f"{output_folders}/{array_file}", array_result, **compress_params
+        )
+
+
+def reorganize_array_dimensions_from_files(
+    array_files: list[str],
+    output_folders: Union[list[str], str],
+    compress_params: dict,
+    func_params: dict,
+):
+    """
+    Reorganize the dimensions of a list of arrays and save them to files.
+    """
+
+    multithreaded_function = partial(
+        _load_reorganize_and_save_to_file,
+        output_folders=output_folders,
+        compress_params=compress_params,
+        bool_seperate_channels=func_params["bool_seperate_channels"],
+        dimensions_as_string=func_params["dimensions_as_string"],
+    )
+
+    n_jobs = func_params["n_jobs"]
+
+    # open all array files using the multithreading library and reorganize the dimensions
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        tqdm(
+            executor.map(
+                multithreaded_function,
+                array_files,
+                range(len(array_files)),
+            ),
+            total=len(array_files),
+            desc="Reorganizing array",
+        )
 
 
 def compute_mask(
@@ -262,13 +511,11 @@ def compute_mask(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            mask = np.array(
-                process_map(
-                    func_parallel,
-                    image,
-                    max_workers=max_workers,
-                    desc="Thresholding image",
-                )
+            mask = process_map(
+                func_parallel,
+                image,
+                max_workers=max_workers,
+                desc="Thresholding image",
             )
     else:
         # Single image processing
@@ -282,7 +529,8 @@ def compute_mask(
             registered_image=registered_image,
         )
 
-    return mask
+    return np.array(mask)
+
 
 def global_image_equalization(
     image: np.ndarray,
@@ -291,7 +539,6 @@ def global_image_equalization(
     mask: np.ndarray = None,
     n_jobs: int = -1,
 ) -> np.ndarray:
-    
     """
     Performs global image equalization on either a single image or a temporal stack of images.
     Stretches the image histogram by remapping intesities in the range [perc_low, perc_high] to the range [0, 1].
@@ -313,21 +560,19 @@ def global_image_equalization(
     if is_temporal:
         # apply percentile function along first axis
         perc_low, perc_high = np.nanpercentile(
-            image, 
-            q=[perc_low, perc_high], 
-            axis=(1,2,3),
-            keepdims=True
+            image, q=[perc_low, perc_high], axis=(1, 2, 3), keepdims=True
         )
     else:
         perc_low, perc_high = np.nanpercentile(image, [perc_low, perc_high])
 
     image_norm = (image - perc_low) / (perc_high - perc_low + 1e-8)
 
-    if not(mask is None):
+    if mask is not None:
         image_norm = np.where(mask, image_norm, 0.0)
 
     return np.clip(image_norm, 0, 1)
-    
+
+
 def _local_equalization_parallel(
     tuple_input: tuple[np.ndarray, np.ndarray],
     box_size: int,
@@ -347,7 +592,6 @@ def _local_equalization_parallel(
 
     return image_norm
 
-        
 
 def local_image_equalization(
     image: np.ndarray,
@@ -395,7 +639,9 @@ def local_image_equalization(
             image_norm = [
                 func_parallel(im, mask=ma)
                 for im, ma in tqdm(
-                    zip(image, mask), desc="Local equalization", total=image.shape[0]
+                    zip(image, mask, strict=False),
+                    desc="Local equalization",
+                    total=image.shape[0],
                 )
             ]
 
@@ -405,12 +651,14 @@ def local_image_equalization(
                 cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
             )
 
-            image_norm = process_map(
-                func_parallel,
-                zip(image, mask),
-                max_workers=max_workers,
-                desc="Local equalization",
-                total=image.shape[0],
+            image_norm = np.array(
+                process_map(
+                    func_parallel,
+                    zip(image, mask, strict=False),
+                    max_workers=max_workers,
+                    desc="Local equalization",
+                    total=image.shape[0],
+                )
             )
     else:
         # Apply local equalization to the image
@@ -426,7 +674,7 @@ def local_image_equalization(
         # Set the background to zero using the mask
         image_norm = np.where(mask, image_norm, 0.0)
 
-    return np.clip(image_norm, 0, 1)
+    return np.clip(np.array(image_norm), 0, 1)
 
 
 def normalize_intensity(
@@ -566,7 +814,7 @@ def segment_stardist(
         )
 
     from stardist import gputools_available
-    
+
     if gputools_available():
         _purge_gpu_memory()
 
@@ -594,7 +842,7 @@ def segment_stardist_from_files(
         )
 
     from stardist import gputools_available
-    
+
     if gputools_available():
         _purge_gpu_memory()
 
@@ -773,7 +1021,7 @@ def align_array_major_axis_from_files(
         compress_params=compress_params,
     )
 
-    n_jobs = func_params.get("n_jobs", -1)
+    n_jobs = func_params["n_jobs"]
 
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
@@ -878,7 +1126,7 @@ def crop_array_using_mask_from_files(
     # open all mask files using the multithreading library
     mask_slices = []
 
-    n_jobs = func_params.get("n_jobs", -1)
+    n_jobs = func_params["n_jobs"]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
         mask_slices = list(
@@ -1220,7 +1468,8 @@ def masked_gaussian_smooth_sparse(
                             zip(
                                 sparse_array,
                                 positions,
-                                disable=not progress_bars, strict=False,
+                                disable=not progress_bars,
+                                strict=False,
                             )
                         )
                     ]
