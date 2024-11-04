@@ -56,6 +56,7 @@ def _normalize_intensity(
     sigma=None,
     mask: np.ndarray = None,
     labels: np.ndarray = None,
+    wavelength_image: float = None,
     width=3,
 ):
     """
@@ -70,6 +71,7 @@ def _normalize_intensity(
     - mask (ndarray, optional): A binary mask of the sample. Default is None.
     - labels (ndarray, optional): An array of labels indicating the instances in which the reference
         signal is expressed, e.g nuclei. Default is None.
+    - wavelength_image (float, optional): The wavelength of the image. Default is None.
     - width (int, optional): The number of neighboring planes to consider for reference plane calculation. Default is 5.
 
     Returns:
@@ -81,6 +83,11 @@ def _normalize_intensity(
 
     labels_mask = None if labels is None else labels.astype(bool)
 
+    #apply wavelength correction
+    if wavelength_image is not None:
+        exponentiation_coeff = 
+        
+        ref_array = ref_array ** exponentiation_coeff
     # compute smoothed reference array for normalization
     if sigma is None:
         sigma = _optimize_sigma(ref_array, mask, labels_mask)
