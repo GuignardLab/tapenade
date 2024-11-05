@@ -683,6 +683,7 @@ def normalize_intensity(
     sigma: float = None,
     mask: np.ndarray = None,
     labels: np.ndarray = None,
+    image_wavelength: float = None,
     width: int = 3,
     n_jobs: int = -1,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -698,6 +699,7 @@ def normalize_intensity(
     - mask: numpy array, binary mask of the sample (default: None)
     - labels: numpy array, labels indicating the instances in which the reference
         signal is expressed (default: None)
+    - image_wavelength: float, wavelength of the image (default: None)
     - width: int, number of neighboring planes to consider for reference plane
         calculation (default: 3)
     - n_jobs: int, number of parallel jobs to use (-1 for all available CPUs, 1 for
@@ -726,6 +728,7 @@ def normalize_intensity(
                     sigma=sigma,
                     mask=ma,
                     labels=lab,
+                    image_wavelength=image_wavelength,
                     width=width,
                 )
                 for im, ref_im, ma, lab in tqdm(
@@ -742,6 +745,7 @@ def normalize_intensity(
                 sigma=sigma,
                 mask=mask,
                 labels=labels,
+                image_wavelength=image_wavelength,
                 width=width,
             )
 
@@ -765,6 +769,7 @@ def normalize_intensity(
             sigma=sigma,
             mask=mask,
             labels=labels,
+            image_wavelength=image_wavelength,
             width=width,
         )
 
