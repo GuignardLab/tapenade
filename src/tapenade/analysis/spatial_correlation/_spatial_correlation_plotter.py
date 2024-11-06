@@ -144,6 +144,8 @@ class SpatialCorrelationPlotter:
             Y=quantity_Y,
             percentilesY=percentiles_Y,
         )
+        
+        bins = list(bins)
 
         if extent_X is None:
             extent_X = (np.min(quantity_X), np.max(quantity_X))
@@ -154,7 +156,6 @@ class SpatialCorrelationPlotter:
         else:
             bins[1] = np.linspace(extent_Y[0], extent_Y[1], bins[1] + 1)
 
-        bins = list(bins)
 
         if fig_ax_tuple is None:
             fig, ax = plt.subplots(figsize=figsize)
