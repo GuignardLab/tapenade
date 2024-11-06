@@ -156,7 +156,6 @@ class SpatialCorrelationPlotter:
         else:
             bins[1] = np.linspace(extent_Y[0], extent_Y[1], bins[1] + 1)
 
-
         if fig_ax_tuple is None:
             fig, ax = plt.subplots(figsize=figsize)
         else:

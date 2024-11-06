@@ -112,10 +112,10 @@ All methods are explained in details in our Jupyter notebooks, which are availab
 During the pre-processing stage, dynamical exploration and interaction led to faster tuning of the parameters by allowing direct visual feedback, and gave key biophysical insight during the analysis stage. 
 We thus created three user-friendly Napari plugins designed around facilitating such interactions:
 
-1. **napari-organoid-registration** (available [here](https://github.com/GuignardLab/napari-manual-registration))
+1. **napari-manual-registration** (available [here](https://github.com/GuignardLab/napari-manual-registration))
 When using our automatic registration tool to spatially register two views of the same organoid, we were sometimes faced with the issue that the tool would not converge to the true registration transformation. This happens when the initial position and orientation of the floating view are too far from their target values. We thus designed a Napari plugin to quickly find a transformation that can be used to initialize our registration tool close to the optimal transformation. From two images loaded in Napari representing two views of the same organoid, the plugin allows the user to either (i) manually define a rigid transformation by continually varying 3D rotations and translations while observing the results until a satisfying fit is found, or to (ii) annotate matching salient landmarks (e.g bright dead cells or lumen-like structures) in both the reference and floating views, from which an optimal rigid transformation can be found automatically using principal component analysis. 
 
-2. **napari-organoid-preprocessing** (available [here](https://github.com/GuignardLab/napari-tapenade-processing))
+2. **napari-tapenade-processing** (available [here](https://github.com/GuignardLab/napari-tapenade-processing))
 From a given set of raw images, segmented object instances, and object mask, the plugin allows the user to quickly run all pre-processing functions from our main pipeline with custom parameters while being able to see and interact with the result of each step. For large datasets that are cumbersome to manipulate or cannot be loaded in Napari, the plugin provides a macro recording feature: the users can experiment and design their own pipeline on a smaller subset of the dataset, then run it on the full dataset without having to load it in Napari.
 
 2. **napari-spatial-correlation-plotter** (available [here](https://github.com/GuignardLab/napari-spatial-correlation-plotter))
