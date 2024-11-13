@@ -53,7 +53,7 @@ def tensors_to_napari_vectors(
         eigen_values = np.sqrt(
             np.einsum('ij,lj->li', axis_decoupling_matrix, eigen_values)
         )
-        eigen_values = eigen_values * np.sqrt(5 / volumes.reshape(-1, 1, 1))
+        eigen_values = eigen_values * np.sqrt(5 / volumes.reshape(-1, 1))
     
     # WARNING: the scipy documentation is wrong, the eigenvectors are in the columns
     # not the lines, i.e principal_vectors[:,:,0] is the 0th principal vector
