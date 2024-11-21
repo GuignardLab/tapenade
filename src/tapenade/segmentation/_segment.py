@@ -115,3 +115,26 @@ def tresh_distribution(
         if intensity > threshold:
             id_merged_cells.append(int(intensity_distribution[index, 0]))
     return id_merged_cells
+
+def remove_small_objects(segmentation: np.ndarray, min_size: int):
+    """
+    Remove small objects from a segmentation, using the threshold volume given as a parameter.
+
+    Parameters:
+    segmentation: array containing the labels
+    min_size: minimum size of the objects to keep
+
+    Returns:
+    The modified segmentation array.
+    """
+    seg_filt = np.copy(segmentation)
+    unique_labels, label_counts = np.unique(segmentation, return_counts=True)
+
+    smallest_labels = unique_labels[np.argsort(label_counts)]
+    smallest_volumes = np.sort(label_counts)
+
+    for label, volume in zip(smallest_labels, smallest_volumes):
+        if volume<min_size :
+            seg_filt[segmentation==label]=0
+
+    return(seg_filt)
