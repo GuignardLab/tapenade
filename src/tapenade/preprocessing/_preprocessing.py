@@ -50,7 +50,7 @@ In typical order:
 
 
 def isotropize_and_normalize(
-    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0
+    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0,wavelength_dependent_normalization:bool=False
 ):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
@@ -74,6 +74,7 @@ def isotropize_and_normalize(
     norm_image : np.array
         normalized and isotropic image
     """
+    list_wavelengths = [405, 488, 555, 647] 
 
     if len(image.shape) > 3:  # if multichannel image
         nb_channels = image.shape[1]
@@ -114,22 +115,41 @@ def isotropize_and_normalize(
         norm_image = np.zeros_like(iso_image)
         for ch_float in liste_float_channels:
             channel = iso_image[:, ch_float, :, :]
-            channel_norm = normalize_intensity(
-                image=channel,
+            if wavelength_dependent_normalization==False:
+                channel_norm = normalize_intensity(
+                    image=channel,
+                    ref_image=ref_channel,
+                    mask=mask_iso,
+                    labels=seg_iso,
+                    sigma=sigma,
+                )
+            else :    
+                channel_norm = normalize_intensity(
+                    image=channel,
+                    ref_image=ref_channel,
+                    mask=mask_iso,
+                    labels=seg_iso,
+                    sigma=sigma,
+                    image_wavelength=list_wavelengths[ch_float]
+                )
+            norm_image[:, ch_float, :, :] = channel_norm
+        if wavelength_dependent_normalization==False:
+            ref_norm = normalize_intensity(
+                image=ref_channel,
                 ref_image=ref_channel,
                 mask=mask_iso,
                 labels=seg_iso,
                 sigma=sigma,
             )
-
-            norm_image[:, ch_float, :, :] = channel_norm
-        ref_norm = normalize_intensity(
-            image=ref_channel,
-            ref_image=ref_channel,
-            mask=mask_iso,
-            labels=seg_iso,
-            sigma=sigma,
-        )
+        else : 
+            ref_norm = normalize_intensity(
+                image=ref_channel,
+                ref_image=ref_channel,
+                mask=mask_iso,
+                labels=seg_iso,
+                sigma=sigma,
+                image_wavelength=list_wavelengths[pos_ref]
+            )
         norm_image[:, pos_ref, :, :] = ref_norm
 
     else:  # 3D data, one channel
@@ -683,6 +703,7 @@ def normalize_intensity(
     sigma: float = None,
     mask: np.ndarray = None,
     labels: np.ndarray = None,
+    image_wavelength: float = None,
     width: int = 3,
     n_jobs: int = -1,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -698,6 +719,7 @@ def normalize_intensity(
     - mask: numpy array, binary mask of the sample (default: None)
     - labels: numpy array, labels indicating the instances in which the reference
         signal is expressed (default: None)
+    - image_wavelength: float, wavelength of the image (default: None)
     - width: int, number of neighboring planes to consider for reference plane
         calculation (default: 3)
     - n_jobs: int, number of parallel jobs to use (-1 for all available CPUs, 1 for
@@ -707,7 +729,7 @@ def normalize_intensity(
     - image_norm: numpy array, normalized input image
     - ref_image_norm: numpy array, normalized reference image
     """
-
+    # this is a temporary solution while no continuous fit is implemented
     is_temporal = image.ndim == 4
 
     if is_temporal:
@@ -726,6 +748,7 @@ def normalize_intensity(
                     sigma=sigma,
                     mask=ma,
                     labels=lab,
+                    image_wavelength=image_wavelength,
                     width=width,
                 )
                 for im, ref_im, ma, lab in tqdm(
@@ -742,6 +765,7 @@ def normalize_intensity(
                 sigma=sigma,
                 mask=mask,
                 labels=labels,
+                image_wavelength=image_wavelength,
                 width=width,
             )
 
@@ -765,6 +789,7 @@ def normalize_intensity(
             sigma=sigma,
             mask=mask,
             labels=labels,
+            image_wavelength=image_wavelength,
             width=width,
         )
 
