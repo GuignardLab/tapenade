@@ -1556,7 +1556,7 @@ def masked_gaussian_smooth_sparse(
 
     else:
         return _masked_smooth_gaussian_sparse(
-            array=sparse_array,
+            sparse_array=sparse_array,
             positions=positions,
             sigmas=sigmas,
             dim_space=dim_space,

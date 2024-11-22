@@ -76,7 +76,7 @@ def _masked_smooth_gaussian(
 
 
 @numba.jit(nopython=True, fastmath=True)
-def _loop_numba(cols, values, dists, n_points, dim_points):
+def _loop_numba(rows, cols, sparse_array_values, dists, n_points, dim_points):
     """
     Computes the actual smoothing kernel operation from the old to the new positions.
     NEVER SET PARALLEL=True IN NUMBA DECORATOR, IT WILL BREAK THE CODE.
@@ -84,19 +84,18 @@ def _loop_numba(cols, values, dists, n_points, dim_points):
 
     smoothed_points = np.zeros((n_points, dim_points))
     normalization_values = np.zeros((n_points, 1))
-    # normalization_values = np.ones((n_points,1))  # * 0.1
 
-    for i in range(len(values)):
+    for i in range(len(rows)): # n_pairs iterations
         exp_dist = np.exp(-dists[i] ** 2 / 2)
-        smoothed_points[cols[i]] += values[i] * exp_dist
-        normalization_values[cols[i]] += exp_dist
+        smoothed_points[rows[i]] += sparse_array_values[cols[i]] * exp_dist
+        normalization_values[rows[i]] += exp_dist
 
     for j in range(n_points):
         if normalization_values[j] > 0:
             smoothed_points[j] /= normalization_values[j]
-    # smoothed_points /= normalization_values
 
-    return smoothed_points
+    return smoothed_points, normalization_values
+
 
 
 def _masked_smooth_gaussian_sparse(
@@ -133,16 +132,38 @@ def _masked_smooth_gaussian_sparse(
     smoothed_array[:, :dim_space] = positions
 
     # Find the nearest neighbors of each point
-    sparse_dist_matrix = old_tree.sparse_distance_matrix(
-        new_tree, max_distance=3, output_type="coo_matrix"
+    sparse_dist_matrix = new_tree.sparse_distance_matrix(
+        old_tree, max_distance=3, output_type="coo_matrix"
     )
-    cols = sparse_dist_matrix.col
-    rows = sparse_dist_matrix.row
-    dists = sparse_dist_matrix.data
-    values = sparse_array[rows, dim_space:]
+    cols = sparse_dist_matrix.col # old indices, shape (n_pairs,)
+    rows = sparse_dist_matrix.row # new indices, shape (n_pairs,)
+    dists = sparse_dist_matrix.data # shape (n_pairs,)
+    sparse_array_values = sparse_array[:, dim_space:] # shape (n_old, dim_points)
 
-    smoothed_array[:, dim_space:] = _loop_numba(
-        cols, values, dists, n_points, dim_points
+    smoothed_values, norm_values = _loop_numba(
+        rows, cols, sparse_array_values, dists, n_points, dim_points
     )
+
+    smoothed_array[:, dim_space:] = smoothed_values
+
+    where_0 = np.where(norm_values == 0)[0]
+    if len(where_0) > 0:
+        # query 10 nearest neighbors if the point has no neighbors
+        k = min(10, old_positions.shape[0])
+        dists_nn, indices_nn = old_tree.query(positions[where_0], k=k)
+
+        dists_nn2_2 = dists_nn ** 2 / 2
+        # prevent underflow
+        dists_nn2_2 = dists_nn2_2 - np.min(dists_nn2_2, axis=1).reshape(-1, 1)
+        
+        exp_dists = np.exp(-dists_nn2_2).reshape(-1, k, 1)
+        norm_values = np.sum(exp_dists, axis=1).reshape(-1, 1)
+
+        values_nn = sparse_array_values[indices_nn.flatten()].reshape(-1, k, dim_points)
+
+        smoothed_values = np.sum(values_nn * exp_dists, axis=1)
+        smoothed_values /= norm_values
+
+        smoothed_array[where_0, dim_space:] = smoothed_values
 
     return smoothed_array
