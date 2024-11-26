@@ -16,14 +16,14 @@ def _load_model(model_path: str):
 
     try:
         from stardist.models import StarDist3D
+        model_name = Path(model_path).stem
+        directory = str(os.path.split(model_path)[0])
+        model = StarDist3D(None, name=model_name, basedir=directory)
+        return model
     except ImportError:
         warnings.warn("Please install Stardist for your system")
+        raise ImportError("Please install Stardist for your system")
 
-    model_name = Path(model_path).stem
-    directory = str(os.path.split(model_path)[0])
-    model = StarDist3D(None, name=model_name, basedir=directory)
-
-    return model
 
 
 def _segment_stardist(image: np.ndarray, model, thresholds_dict: dict):
