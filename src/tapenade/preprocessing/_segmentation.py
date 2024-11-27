@@ -41,20 +41,22 @@ def _segment_stardist(image: np.ndarray, model, thresholds_dict: dict):
 
     try:
         from stardist import gputools_available
+
+        if gputools_available():
+            model.use_gpu = True
+
+        if thresholds_dict is not None:
+            model.thresholds = thresholds_dict
+
+        labels, _ = model.predict_instances(
+            image, n_tiles=model._guess_n_tiles(image)
+        )
+
+        return labels.astype(np.uint16)
+
     except ImportError:
         warnings.warn("Please install Stardist for your system")
-
-    if gputools_available():
-        model.use_gpu = True
-
-    if thresholds_dict is not None:
-        model.thresholds = thresholds_dict
-
-    labels, _ = model.predict_instances(
-        image, n_tiles=model._guess_n_tiles(image)
-    )
-
-    return labels.astype(np.uint16)
+        raise ImportError("Please install Stardist for your system")
 
 
 def _purge_gpu_memory():
