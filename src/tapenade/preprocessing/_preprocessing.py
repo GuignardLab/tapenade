@@ -18,7 +18,7 @@ from tapenade.preprocessing._axis_alignment import (
 from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
-from tapenade.preprocessing._local_equalization import _local_equalization
+from tapenade.preprocessing._local_contrast_enhancement import _local_contrast_enhancement
 from tapenade.preprocessing._segmentation import (
     _load_model,
     _purge_gpu_memory,
@@ -40,7 +40,7 @@ from tapenade.preprocessing._thresholding import _compute_mask
 In typical order:
     1. making array isotropic
     2. compute mask
-    3. local image equalization
+    3. local/global image contrast enhancement
     4. segmentation, e.g with StarDist
     (5. spatial registration, not covered here)
     (6. temporal registration, not covered here)
@@ -50,7 +50,7 @@ In typical order:
 
 
 def isotropize_and_normalize(
-    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0
+    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0,wavelength_dependent_normalization:bool=False
 ):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
@@ -74,6 +74,7 @@ def isotropize_and_normalize(
     norm_image : np.array
         normalized and isotropic image
     """
+    list_wavelengths = [405, 488, 555, 647] 
 
     if len(image.shape) > 3:  # if multichannel image
         nb_channels = image.shape[1]
@@ -114,22 +115,41 @@ def isotropize_and_normalize(
         norm_image = np.zeros_like(iso_image)
         for ch_float in liste_float_channels:
             channel = iso_image[:, ch_float, :, :]
-            channel_norm = normalize_intensity(
-                image=channel,
+            if wavelength_dependent_normalization==False:
+                channel_norm = normalize_intensity(
+                    image=channel,
+                    ref_image=ref_channel,
+                    mask=mask_iso,
+                    labels=seg_iso,
+                    sigma=sigma,
+                )
+            else :    
+                channel_norm = normalize_intensity(
+                    image=channel,
+                    ref_image=ref_channel,
+                    mask=mask_iso,
+                    labels=seg_iso,
+                    sigma=sigma,
+                    image_wavelength=list_wavelengths[ch_float]
+                )
+            norm_image[:, ch_float, :, :] = channel_norm
+        if wavelength_dependent_normalization==False:
+            ref_norm = normalize_intensity(
+                image=ref_channel,
                 ref_image=ref_channel,
                 mask=mask_iso,
                 labels=seg_iso,
                 sigma=sigma,
             )
-
-            norm_image[:, ch_float, :, :] = channel_norm
-        ref_norm = normalize_intensity(
-            image=ref_channel,
-            ref_image=ref_channel,
-            mask=mask_iso,
-            labels=seg_iso,
-            sigma=sigma,
-        )
+        else : 
+            ref_norm = normalize_intensity(
+                image=ref_channel,
+                ref_image=ref_channel,
+                mask=mask_iso,
+                labels=seg_iso,
+                sigma=sigma,
+                image_wavelength=list_wavelengths[pos_ref]
+            )
         norm_image[:, pos_ref, :, :] = ref_norm
 
     else:  # 3D data, one channel
@@ -532,7 +552,7 @@ def compute_mask(
     return np.array(mask)
 
 
-def global_image_equalization(
+def global_contrast_enhancement(
     image: np.ndarray,
     perc_low: float,
     perc_high: float,
@@ -540,19 +560,19 @@ def global_image_equalization(
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
-    Performs global image equalization on either a single image or a temporal stack of images.
+    Performs global contrast enhancement on either a single image or a temporal stack of images.
     Stretches the image histogram by remapping intesities in the range [perc_low, perc_high] to the range [0, 1].
     This helps to enhance the contrast and improve the visibility of structures in the image.
 
     Parameters:
     - image: numpy array, input image or temporal stack of images
-    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
-    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
+    - perc_low: float, lower percentile for intensity mapping (between 0 and 100)
+    - perc_high: float, upper percentile for intensity mapping (between 0 and 100)
     - mask: numpy array, binary mask used to set the background to zero (optional)
     - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
     Returns:
-    - image_norm: numpy array, equalized image or stack of equalized images
+    - image_norm: numpy array, enhanced image or stack of enhanced images
     """
 
     is_temporal = image.ndim == 4
@@ -573,7 +593,7 @@ def global_image_equalization(
     return np.clip(image_norm, 0, 1)
 
 
-def _local_equalization_parallel(
+def _local_contrast_enhancement_parallel(
     tuple_input: tuple[np.ndarray, np.ndarray],
     box_size: int,
     perc_low: float,
@@ -582,7 +602,7 @@ def _local_equalization_parallel(
 
     image, mask = tuple_input
 
-    image_norm = _local_equalization(
+    image_norm = _local_contrast_enhancement(
         image,
         box_size=box_size,
         perc_low=perc_low,
@@ -593,7 +613,7 @@ def _local_equalization_parallel(
     return image_norm
 
 
-def local_image_equalization(
+def local_contrast_enhancement(
     image: np.ndarray,
     box_size: int,
     perc_low: float,
@@ -602,21 +622,21 @@ def local_image_equalization(
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
-    Performs local image equalization on either a single image or a temporal stack of images.
+    Performs local image contrast enhancement on either a single image or a temporal stack of images.
     Stretches the image histogram in local neighborhoods by remapping intesities in the range
     [perc_low, perc_high] to the range [0, 1].
     This helps to enhance the contrast and improve the visibility of structures in the image.
 
     Parameters:
     - image: numpy array, input image or temporal stack of images
-    - box_size: int, size of the local neighborhood for equalization
-    - perc_low: float, lower percentile for intensity equalization (between 0 and 100)
-    - perc_high: float, upper percentile for intensity equalization (between 0 and 100)
+    - box_size: int, size of the local neighborhood for contrast enhancement
+    - perc_low: float, lower percentile for intensity mapping (between 0 and 100)
+    - perc_high: float, upper percentile for intensity mapping (between 0 and 100)
     - mask: numpy array, binary mask used to set the background to zero (optional)
     - n_jobs: int, number of parallel jobs to use (not used currently as the function is parallelized internally)
 
     Returns:
-    - image_norm: numpy array, equalized image or stack of equalized images
+    - image_norm: numpy array, enahnced image or stack of enahnced images
     """
 
     is_temporal = image.ndim == 4
@@ -628,7 +648,7 @@ def local_image_equalization(
             mask = [None] * image.shape[0]
 
         func_parallel = partial(
-            _local_equalization_parallel,
+            _local_contrast_enhancement_parallel,
             box_size=box_size,
             perc_low=perc_low,
             perc_high=perc_high,
@@ -640,7 +660,7 @@ def local_image_equalization(
                 func_parallel(im, mask=ma)
                 for im, ma in tqdm(
                     zip(image, mask, strict=False),
-                    desc="Local equalization",
+                    desc="Local contrast enhancement",
                     total=image.shape[0],
                 )
             ]
@@ -656,13 +676,13 @@ def local_image_equalization(
                     func_parallel,
                     zip(image, mask, strict=False),
                     max_workers=max_workers,
-                    desc="Local equalization",
+                    desc="Local contrast enhancement",
                     total=image.shape[0],
                 )
             )
     else:
-        # Apply local equalization to the image
-        image_norm = _local_equalization(
+        # Apply local contrast enhancement to the image
+        image_norm = _local_contrast_enhancement(
             image,
             box_size=box_size,
             perc_low=perc_low,
@@ -683,6 +703,7 @@ def normalize_intensity(
     sigma: float = None,
     mask: np.ndarray = None,
     labels: np.ndarray = None,
+    image_wavelength: float = None,
     width: int = 3,
     n_jobs: int = -1,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -698,6 +719,7 @@ def normalize_intensity(
     - mask: numpy array, binary mask of the sample (default: None)
     - labels: numpy array, labels indicating the instances in which the reference
         signal is expressed (default: None)
+    - image_wavelength: float, wavelength of the image (default: None)
     - width: int, number of neighboring planes to consider for reference plane
         calculation (default: 3)
     - n_jobs: int, number of parallel jobs to use (-1 for all available CPUs, 1 for
@@ -707,7 +729,7 @@ def normalize_intensity(
     - image_norm: numpy array, normalized input image
     - ref_image_norm: numpy array, normalized reference image
     """
-
+    # this is a temporary solution while no continuous fit is implemented
     is_temporal = image.ndim == 4
 
     if is_temporal:
@@ -726,6 +748,7 @@ def normalize_intensity(
                     sigma=sigma,
                     mask=ma,
                     labels=lab,
+                    image_wavelength=image_wavelength,
                     width=width,
                 )
                 for im, ref_im, ma, lab in tqdm(
@@ -742,6 +765,7 @@ def normalize_intensity(
                 sigma=sigma,
                 mask=mask,
                 labels=labels,
+                image_wavelength=image_wavelength,
                 width=width,
             )
 
@@ -765,6 +789,7 @@ def normalize_intensity(
             sigma=sigma,
             mask=mask,
             labels=labels,
+            image_wavelength=image_wavelength,
             width=width,
         )
 

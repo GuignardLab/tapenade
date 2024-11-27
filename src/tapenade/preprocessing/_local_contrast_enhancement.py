@@ -4,7 +4,7 @@ import numpy as np
 from scipy.ndimage import zoom
 
 
-def _local_equalization(
+def _local_contrast_enhancement(
     image: np.ndarray,
     box_size: int,
     perc_low: float,
@@ -15,26 +15,26 @@ def _local_equalization(
     Performs local histogram stretching by applying the following steps:
         1. compute the percentile values in a neighborhood around voxels chosen on a regular grid.
         2. interpolate these values on each voxel of the image.
-        3. perform a linear equalization between the interpolated percentile values and the values 0 and 1.
+        3. perform a linear mapping between the interpolated percentile values and the values 0 and 1.
         4. clip the image voxel values between 0 and 1.
 
     Parameters
     ----------
     image : np.ndarray
-        The image to equalize.
+        The image to enhance.
     box_size : int
         size of the neighborhood box around each voxel to compute the percentile values.
     perc_low : float
-        percentile value to use as the low value of the equalization (will be mapped to 0).
+        percentile value to use as the low value of the intensity mapping (will be mapped to 0).
     perc_high : float
-        percentile value to use as the high value of the equalization (will be mapped to 1).
+        percentile value to use as the high value of the intensity mapping (will be mapped to 1).
     mask : np.ndarray
         An optional mask boolean array from which background values will be excluded from the computation.
 
     Returns
     -------
     image_norm : np.ndarray
-        The equalized image.
+        The enhanced image.
     """
 
     # Compute necessary variables
@@ -99,7 +99,7 @@ def _local_equalization(
     denom[denom == 0] = 1
     denom += 1e-8
 
-    # Perform linear equalization and clip image voxel values
+    # Perform linear mapping and clip image voxel values
     # image_norm = np.clip((image - full_percs_low) / denom, 0, 1)
     image_norm = (image - full_percs_low) / denom
 
