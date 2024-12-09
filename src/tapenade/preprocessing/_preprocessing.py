@@ -482,6 +482,7 @@ def compute_mask(
     post_processing_method: str = "fill_holes",
     keep_largest_cc: bool = True,
     registered_image: bool = False,
+    n_erosion_steps: int = 0,
     n_jobs: int = -1,
 ) -> np.ndarray:
     """
@@ -494,11 +495,11 @@ def compute_mask(
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold (default: 1)
-    - post_processing_method: str, method to use for post-processing the mask. Can be 'convex_hull' to compute
-      the convex hull of the mask, 'fill_holes' to fill holes in the mask, or 'none' to skip post-processing
-      (default: 'fill_holes')
+    - post_processing_method: str, Can be 'convex_hull' to compute the convex hull of the mask,
+      'fill_holes' to fill holes each plane separately, or 'none' to skip post-processing (default: 'fill_holes')
     - keep_largest_cc: bool, set to True to keep only the largest connected component in the mask (default: True)
     - n_jobs: int, number of parallel jobs to run (-1 for using all available CPUs)
+    - n_erosion_steps: int, number of erosion steps to apply to the mask after post-processing.
 
     Returns:
     - mask: numpy array, binary mask of the same shape as the input image
@@ -515,6 +516,7 @@ def compute_mask(
             post_processing_method=post_processing_method,
             keep_largest_cc=keep_largest_cc,
             registered_image=registered_image,
+            n_erosion_steps=n_erosion_steps,
         )
 
         if n_jobs == 1:
@@ -547,6 +549,7 @@ def compute_mask(
             post_processing_method=post_processing_method,
             keep_largest_cc=keep_largest_cc,
             registered_image=registered_image,
+            n_erosion_steps=n_erosion_steps,
         )
 
     return np.array(mask)

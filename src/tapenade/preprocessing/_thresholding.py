@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, binary_erosion
 from scipy.ndimage.morphology import binary_fill_holes
 from skimage.filters import threshold_otsu
 from skimage.measure import label
@@ -222,6 +222,7 @@ def _compute_mask(
     keep_largest_cc: bool = True,
     post_processing_method: str = "fill_holes",
     registered_image: bool = False,
+    n_erosion_steps: int = 0,
 ) -> np.ndarray:
     """
     Process the mask for the given image.
@@ -238,6 +239,7 @@ def _compute_mask(
       the convex hull of the mask, 'fill_holes' to fill holes in each 2D slice of the mask, or 'none' to skip
     - registered_image: bool, set to True if the image has been registered beforehand and thus
       contains large regions of zeros that lead to sharp intensity gradients at the boundaries.
+    - n_erosion_steps: int, number of erosion steps to apply to the mask after post-processing.
 
     Returns:
     - mask: numpy array, binary mask of the same shape as the input image
@@ -263,5 +265,8 @@ def _compute_mask(
     # Refine the mask by keeping only the largest connected component and filling holes
     if keep_largest_cc or post_processing_method != "none":
         mask = _refine_raw_mask(mask, post_processing_method, keep_largest_cc)
+
+    if n_erosion_steps > 0:
+        mask = binary_erosion(mask, iterations=n_erosion_steps, border_value=1)
 
     return mask
