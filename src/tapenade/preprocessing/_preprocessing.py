@@ -660,8 +660,8 @@ def local_contrast_enhancement(
         if n_jobs == 1:
             # Sequential processing
             image_norm = [
-                func_parallel(im, mask=ma)
-                for im, ma in tqdm(
+                func_parallel(im_ma)
+                for im_ma in tqdm(
                     zip(image, mask, strict=False),
                     desc="Local contrast enhancement",
                     total=image.shape[0],
