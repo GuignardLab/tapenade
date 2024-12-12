@@ -85,11 +85,16 @@ The registration and fusion methods require the `3D-registration` Python package
 
 ### Segmentation (optional)
 
-We provide trained weights for StarDist3D, a state-of-the-art deep learning model for nuclei segmentation. To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
+We provide the model `tapenade_stardist`, which we pretrained on custom annotated datasets of nuclei in gastruloids.
+The model was trained with a fixed isotropic object size, which requires you to rescale and resize your images so that they are isotropic, and that objects have an average diameter of ~15 pixels. The images also need to be normalized (their min and max values mapped to 0 and 1 respectively).
 
-If you prefer to use StarDist3D with a graphical user interface, Stardist3D is also available as a plugin in several softwares, like [Napari](https://github.com/stardist/stardist-napari), [Fiji](https://imagej.net/plugins/stardist), and [Icy](https://github.com/stardist/stardist-icy) (more details on the [Stardist3D repository](https://github.com/stardist/stardist?tab=readme-ov-file#plugins-for-other-software)).
+To fit these 3 constraints, we recommend using functions from our `tapenade` library (defined [here](https://github.com/GuignardLab/tapenade/blob/main/src/tapenade/preprocessing/_preprocessing.py)) via 
+1. `tapenade.preprocessing.change_array_pixelsize` for the resize/rescale step
+2. `tapenade.preprocessing.global_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
 
-We highly recommend using the `change_array_pixelsize` and `local_contrast_enhancement` methods (defined [here](https://github.com/GuignardLab/tapenade/blob/main/src/tapenade/preprocessing/_preprocessing.py)) from our library to preprocess your data before running the inference with our custom StarDist3D weights.
+To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
+
+Alternatively, you can use our Napari plugin `napari-tapenade-processing` if you prefer to work with a graphical interface. Stardist3D is also available as a plugin in several softwares, like [Napari](https://github.com/stardist/stardist-napari), [Fiji](https://imagej.net/plugins/stardist), and [Icy](https://github.com/stardist/stardist-icy) (more details on the [Stardist3D repository](https://github.com/stardist/stardist?tab=readme-ov-file#plugins-for-other-software)).
 
 Though not mandatory, we also recommend running the inference with StarDist3D on a GPU for faster results. If you don't have a GPU, you can use the ZeroCostDL4Mic Google Colab notebooks, which allow you to run the inference on a GPU for free. You can find the ZeroCostDL4Mic notebooks for StarDist3D [here](https://colab.research.google.com/github/HenriquesLab/ZeroCostDL4Mic/blob/master/Colab_notebooks/StarDist_3D_ZeroCostDL4Mic.ipynb).
 
