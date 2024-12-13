@@ -10,7 +10,7 @@
 
 A fully-visual pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
-If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade/blob/main/README.md#how-to-cite).
+If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade/README.md#how-to-cite).
 
 ----------------------------------
 
