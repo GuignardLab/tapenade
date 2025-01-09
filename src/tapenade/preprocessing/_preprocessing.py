@@ -427,11 +427,12 @@ def _load_reorganize_and_save_to_file(
 
     if bool_seperate_channels:
         # save each channel to a separate folder
-        for index, (array_channel, output_folder) in enumerate(
+        for ind_ch, (array_channel, output_folder) in enumerate(
             zip(array_result, output_folders, strict=False)
         ):
+            ind_ch_ = ind_ch + 1
             tifffile.imwrite(
-                f"{output_folder}/{array_file}_ch{index:>02}",
+                f"{output_folder}/reorganized_{index:>04}_ch{ind_ch_:>02}.tif",
                 array_channel,
                 **compress_params,
             )
@@ -463,7 +464,7 @@ def reorganize_array_dimensions_from_files(
 
     # open all array files using the multithreading library and reorganize the dimensions
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        tqdm(
+        list(tqdm(
             executor.map(
                 multithreaded_function,
                 array_files,
@@ -471,7 +472,7 @@ def reorganize_array_dimensions_from_files(
             ),
             total=len(array_files),
             desc="Reorganizing array",
-        )
+        ))
 
 
 def compute_mask(
@@ -1053,7 +1054,7 @@ def align_array_major_axis_from_files(
 
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        tqdm(
+        list(tqdm(
             executor.map(
                 multithreaded_function,
                 array_files,
@@ -1062,7 +1063,7 @@ def align_array_major_axis_from_files(
             ),
             total=len(array_files),
             desc="Aligning array",
-        )
+        ))
 
 
 def crop_array_using_mask(
@@ -1194,7 +1195,7 @@ def crop_array_using_mask_from_files(
     )
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        tqdm(
+        list(tqdm(
             executor.map(
                 multithreaded_function,
                 array_files,
@@ -1202,7 +1203,7 @@ def crop_array_using_mask_from_files(
             ),
             total=len(array_files),
             desc="Cropping array",
-        )
+        ))
 
 
 def _parallel_gaussian_smooth(
