@@ -79,9 +79,9 @@ pip install -e .
 
 This will install only the main library, without the libraries for the registration/fusion and segmentation methods. To install them, please follow the instructions below. 
 
-### Registration and fusion (optional)
+### Registration and fusion (already installed in the package)
 
-The registration and fusion methods require the `3D-registration` Python package. To install it, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
+The registration and fusion methods require the `3D-registration` Python package, see [repository]([https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation](https://github.com/GuignardLab/registration-tools)).
 
 ### Segmentation (optional)
 
@@ -92,7 +92,7 @@ To fit these 3 constraints, we recommend using functions from our `tapenade` lib
 1. `tapenade.preprocessing.change_array_pixelsize` for the resize/rescale step
 2. `tapenade.preprocessing.global_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
 
-To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
+To install Stardist3D, follow the instructions on the library's [repository](https://github.com/stardist/stardist).
 
 Alternatively, you can use our Napari plugin `napari-tapenade-processing` if you prefer to work with a graphical interface. Stardist3D is also available as a plugin in several softwares, like [Napari](https://github.com/stardist/stardist-napari), [Fiji](https://imagej.net/plugins/stardist), and [Icy](https://github.com/stardist/stardist-icy) (more details on the [Stardist3D repository](https://github.com/stardist/stardist?tab=readme-ov-file#plugins-for-other-software)).
 
