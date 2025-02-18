@@ -77,11 +77,11 @@ cd tapenade
 pip install -e .
 ```
 
-This will install only the main library, without the libraries for the registration/fusion and segmentation methods. To install them, please follow the instructions below. 
+This will install only the main library, without the libraries for the segmentation methods. To install them, please follow the instructions below. 
 
 ### Registration and fusion (already installed in the package)
 
-The registration and fusion methods require the `3D-registration` Python package, see [repository]([https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation](https://github.com/GuignardLab/registration-tools)).
+The registration and fusion methods require the `3D-registration` Python package, see [repository](https://github.com/GuignardLab/registration-tools)
 
 ### Segmentation (optional)
 
@@ -102,7 +102,7 @@ Though not mandatory, we also recommend running the inference with StarDist3D on
 
 The methods described above are available at the following locations:
 
-1. **Spectral filtering**: [Code](src/tapenade/preprocessing/spectral_filtering/XXX), [Notebook](notebooks/spectral_filtering_notebook.ipynb)
+1. **Spectral filtering**: [Notebook](notebooks/spectral_filtering_notebook.ipynb)
 2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](notebooks/registration_notebook.ipynb)
 3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](notebooks/preprocessing_notebook.ipynb)
 4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](notebooks/segmentation_notebook.ipynb)
