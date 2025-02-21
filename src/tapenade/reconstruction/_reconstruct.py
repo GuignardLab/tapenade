@@ -6,7 +6,6 @@ from pathlib import Path
 from xml.dom import minidom
 import tifffile
 import matplotlib.pyplot as plt
-import napari
 import numpy as np
 import registrationtools
 import io
@@ -536,7 +535,7 @@ def check_napari(
         if True, the images are considered as labels, by default False
 
     """
-
+    import napari
     viewer = napari.Viewer()
     if isinstance(reference_image, (str | Path)):
         if os.path.exists(
