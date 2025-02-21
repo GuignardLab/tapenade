@@ -149,14 +149,22 @@ def create_folders(
         os.mkdir(os.path.join(Path(folder_sample) / "weights", "before_trsf"))
         os.mkdir(os.path.join(Path(folder_sample) / "weights", "after_trsf"))
 
-        image_ref = io.imread(Path(folder_experiment) / f"{filename_ref}.tif")
-        image_float = io.imread(
+        # image_ref = io.imread(Path(folder_experiment) / f"{filename_ref}.tif")
+        # image_float = io.imread(
+        #     Path(folder_experiment) / f"{filename_float}.tif"
+        # )
+        image_ref = tifffile.imread(Path(folder_experiment) / f"{filename_ref}.tif")
+        image_float = tifffile.imread(
             Path(folder_experiment) / f"{filename_float}.tif"
         )
+
+
         if len(channels) > 1:
             for ind_ch, ch in enumerate(channels):
-                imref = image_ref[:, :, :, ind_ch]
-                imfloat = image_float[:, :, :, ind_ch]
+                # imref = image_ref[:, :, :, ind_ch]
+                # imfloat = image_float[:, :, :, ind_ch]
+                imref=image_ref[:,ind_ch,:,:]
+                imfloat=image_float[:,ind_ch,:,:]
                 io.imsave(
                     Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
                     imref,  ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
