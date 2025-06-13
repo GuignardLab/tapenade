@@ -5,6 +5,7 @@ from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.morphology import convex_hull_image
 from skimage.transform import rescale, resize
+import warnings
 
 from tapenade.preprocessing._smoothing import _masked_smooth_gaussian
 
@@ -21,6 +22,7 @@ def _snp_threshold_binarization(
     Parameters:
     - image: numpy array, input image
     - sigma_blur: float, standard deviation of the Gaussian blur.
+      Will be automatically set to 1 if it is less than 1.
     - threshold_factor: float, factor to multiply the threshold
     - registered_image: bool, set to True if the image has been registered beforehand
       and thus contains large regions of zeros that lead to sharp intensity gradients
@@ -30,34 +32,32 @@ def _snp_threshold_binarization(
     - binary_mask: numpy array, binary mask computed using SNP thresholding
     """
 
-    if registered_image:
-        nonzero_mask = image > 0
-
-        blurred = _masked_smooth_gaussian(image, mask=nonzero_mask, sigmas=sigma_blur)
-
-        blurred2 = _masked_smooth_gaussian(
-            image**2, mask=nonzero_mask, sigmas=sigma_blur
+    if sigma_blur <= 1:
+        warnings.warn(
+            "_snp_threshold_binarization: sigma_blur should be greater than 1. "
+            "Replacing it with 1, which could still lead to suboptimal results.",
+            UserWarning,
         )
+        sigma_blur = 1
 
-        sigma = blurred2 - blurred**2
+    nonzero_mask = image > 0 if registered_image else None
 
-        snp_array = sigma * blurred
-        snp_mask = snp_array > 0
+    blurred = _masked_smooth_gaussian(
+        image, sigmas=sigma_blur, mask=nonzero_mask,
+    )
 
-        snp_array = np.log(
-            snp_array, where=np.logical_and(nonzero_mask, snp_mask)
-        )
-    else:
-        blurred = _masked_smooth_gaussian(image, sigmas=sigma_blur)
-        blurred2 = _masked_smooth_gaussian(image**2, sigmas=sigma_blur)
+    blurred2 = _masked_smooth_gaussian(
+        image**2, sigmas=sigma_blur, mask=nonzero_mask
+    )
 
-        sigma = blurred2 - blurred**2
+    sigma2 = blurred2 - blurred**2
 
-        snp_array = sigma * blurred
-        snp_mask = snp_array > 0
-        # snp_array = np.log(snp_array, where=(snp_array != 0))
+    snp_array = sigma2 * blurred
+    snp_mask = snp_array > 0
 
-        snp_array = np.log(snp_array, where=snp_mask)
+    snp_array = np.log(
+        snp_array, where=np.logical_and(nonzero_mask, snp_mask)
+    )
 
     threshold = threshold_otsu(snp_array[snp_mask]) * threshold_factor
 
@@ -81,10 +81,11 @@ def _otsu_threshold_binarization(
     Returns:
     - binary_mask: numpy array, binary mask computed using histogram thresholding
     """
-
-    blurred = gaussian_filter(image, sigma=sigma_blur)
-
-    threshold = threshold_otsu(blurred) * threshold_factor
+    if sigma_blur > 0:
+        blurred = gaussian_filter(image, sigma=sigma_blur)
+        threshold = threshold_otsu(blurred) * threshold_factor
+    else:
+        threshold = threshold_otsu(image) * threshold_factor
 
     # Create a binary mask
     binary_mask = blurred > threshold
