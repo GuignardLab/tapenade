@@ -3,8 +3,6 @@
 [![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/tapenade/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/tapenade)
 [![Python Version](https://img.shields.io/pypi/pyversions/tapenade.svg?color=green)](https://python.org)
-[![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
-[![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
 <img src="https://github.com/GuignardLab/tapenade/blob/main/imgs/tapenade3.png" width="100">
 
@@ -85,12 +83,13 @@ The registration and fusion methods require the `3D-registration` Python package
 
 ### Segmentation (optional)
 
-We provide the model `tapenade_stardist`, which we pretrained on custom annotated datasets of nuclei in gastruloids.
+We provide the model `tapenade_stardist` [here](https://zenodo.org/records/14748083) (it can be downloaded independently from the other files), which we pretrained on custom annotated datasets of nuclei in gastruloids. Details are available in our [publication].
+
 The model was trained with a fixed isotropic object size, which requires you to rescale and resize your images so that they are isotropic, and that objects have an average diameter of ~15 pixels. The images also need to be normalized (their min and max values mapped to 0 and 1 respectively).
 
 To fit these 3 constraints, we recommend using functions from our `tapenade` library (defined [here](https://github.com/GuignardLab/tapenade/blob/main/src/tapenade/preprocessing/_preprocessing.py)) via 
 1. `tapenade.preprocessing.change_array_pixelsize` for the resize/rescale step
-2. `tapenade.preprocessing.global_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
+2. `tapenade.preprocessing.local_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
 
 To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
 
@@ -170,3 +169,5 @@ This library was generated using [Cookiecutter] and a custom made template based
 [pytest]: https://docs.pytest.org/
 [conda]: https://conda.io/projects/conda/en/latest/user-guide/install/index.html
 [file an issue]: https://github.com/GuignardLab/tapenade/issues
+
+[publication]: https://doi.org/10.1101/2024.08.13.607832
