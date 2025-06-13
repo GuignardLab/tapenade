@@ -75,11 +75,11 @@ cd tapenade
 pip install -e .
 ```
 
-This will install only the main library, without the libraries for the registration/fusion and segmentation methods. To install them, please follow the instructions below. 
+This will install only the main library, without the libraries for the segmentation methods. To install them, please follow the instructions below. 
 
-### Registration and fusion (optional)
+### Registration and fusion (already installed in the package)
 
-The registration and fusion methods require the `3D-registration` Python package. To install it, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
+The registration and fusion methods require the `3D-registration` Python package, see [repository](https://github.com/GuignardLab/registration-tools)
 
 ### Segmentation (optional)
 
@@ -91,7 +91,7 @@ To fit these 3 constraints, we recommend using functions from our `tapenade` lib
 1. `tapenade.preprocessing.change_array_pixelsize` for the resize/rescale step
 2. `tapenade.preprocessing.local_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
 
-To install Stardist3D, follow the instructions on the library's [repository](https://github.com/GuignardLab/tapenade/tree/main?tab=readme-ov-file#installation).
+To install Stardist3D, follow the instructions on the library's [repository](https://github.com/stardist/stardist).
 
 Alternatively, you can use our Napari plugin `napari-tapenade-processing` if you prefer to work with a graphical interface. Stardist3D is also available as a plugin in several softwares, like [Napari](https://github.com/stardist/stardist-napari), [Fiji](https://imagej.net/plugins/stardist), and [Icy](https://github.com/stardist/stardist-icy) (more details on the [Stardist3D repository](https://github.com/stardist/stardist?tab=readme-ov-file#plugins-for-other-software)).
 
@@ -101,7 +101,7 @@ Though not mandatory, we also recommend running the inference with StarDist3D on
 
 The methods described above are available at the following locations:
 
-1. **Spectral filtering**: [Code](src/tapenade/preprocessing/spectral_filtering/XXX), [Notebook](notebooks/spectral_filtering_notebook.ipynb)
+1. **Spectral filtering**: [Notebook](notebooks/spectral_filtering_notebook.ipynb)
 2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](notebooks/registration_notebook.ipynb)
 3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](notebooks/preprocessing_notebook.ipynb)
 4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](notebooks/segmentation_notebook.ipynb)

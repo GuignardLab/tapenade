@@ -6,7 +6,6 @@ from pathlib import Path
 from xml.dom import minidom
 import tifffile
 import matplotlib.pyplot as plt
-import napari
 import numpy as np
 import registrationtools
 import io
@@ -536,7 +535,7 @@ def check_napari(
         if True, the images are considered as labels, by default False
 
     """
-
+    import napari
     viewer = napari.Viewer()
     if isinstance(reference_image, (str | Path)):
         if os.path.exists(
@@ -714,8 +713,8 @@ def fuse_sides(
     dtype_input = (
         float_im.dtype
     )  # we wil return an image that has the same dtype as the input image
-    mask_r = compute_mask(image = ref_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,compute_convex_hull=False,registered_image=False)
-    mask_f = compute_mask(image = float_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,compute_convex_hull=False,registered_image=False)
+    mask_r = compute_mask(image = ref_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,registered_image=False)
+    mask_f = compute_mask(image = float_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,registered_image=False)
 
     # we compute the weights as a sigmoid function of the distance to the objective (=cumulative sum of the raw image)
     cumsum_r = np.cumsum(mask_r.astype(int), axis=axis)
