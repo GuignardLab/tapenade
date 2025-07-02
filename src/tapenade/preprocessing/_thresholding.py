@@ -56,7 +56,8 @@ def _snp_threshold_binarization(
     snp_mask = snp_array > 0
 
     snp_array = np.log(
-        snp_array, where=np.logical_and(nonzero_mask, snp_mask)
+        snp_array, 
+        where=np.logical_and(nonzero_mask, snp_mask) if registered_image else snp_mask
     )
 
     threshold = threshold_otsu(snp_array[snp_mask]) * threshold_factor
@@ -84,11 +85,11 @@ def _otsu_threshold_binarization(
     if sigma_blur > 0:
         blurred = gaussian_filter(image, sigma=sigma_blur)
         threshold = threshold_otsu(blurred) * threshold_factor
+        binary_mask = blurred > threshold
     else:
         threshold = threshold_otsu(image) * threshold_factor
-
+        binary_mask = image > threshold
     # Create a binary mask
-    binary_mask = blurred > threshold
 
     return binary_mask
 
@@ -197,17 +198,16 @@ def _refine_raw_mask(
     Returns:
     - refined_mask: numpy array, refined binary mask
     """
+    refined_mask = mask.copy()
     # Keep only the largest connected component
     if keep_largest_cc:
-        refined_mask = _get_largest_connected_component(mask)
+        refined_mask = _get_largest_connected_component(refined_mask)
     # Fill holes in the mask
     if post_processing_method == "convex_hull":
         refined_mask = _compute_mask_convex_hull(refined_mask, 3)
     elif post_processing_method == "fill_holes":
         refined_mask = binary_fill_holes(refined_mask)
         refined_mask = _binary_fill_holes_on_each_slice(refined_mask)
-    else:
-        pass
 
     return refined_mask
 

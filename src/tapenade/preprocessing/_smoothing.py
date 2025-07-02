@@ -150,11 +150,9 @@ def _masked_smooth_gaussian_sparse(
     if len(where_0) > 0:
         # query 10 nearest neighbors if the point has no neighbors
         k = min(10, old_positions.shape[0])
-        dists_nn, indices_nn = old_tree.query(positions[where_0], k=k)
+        dists_nn, indices_nn = old_tree.query((positions/sigmas)[where_0], k=k)
 
         dists_nn2_2 = dists_nn ** 2 / 2
-        # prevent underflow
-        dists_nn2_2 = dists_nn2_2 - np.min(dists_nn2_2, axis=1).reshape(-1, 1)
         
         exp_dists = np.exp(-dists_nn2_2).reshape(-1, k, 1)
         norm_values = np.sum(exp_dists, axis=1).reshape(-1, 1)
