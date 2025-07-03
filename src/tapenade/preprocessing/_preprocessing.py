@@ -844,8 +844,8 @@ def segment_stardist(
 
     from stardist import gputools_available
 
-    if gputools_available():
-        _purge_gpu_memory()
+    # if gputools_available(): # COMMENT FOR NOW
+    #     _purge_gpu_memory()
 
     return labels
 
