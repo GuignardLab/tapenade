@@ -2,6 +2,7 @@ from os import cpu_count
 from tqdm import tqdm
 import numpy as np
 from tqdm.contrib.concurrent import process_map
+from skimage.measure import regionprops
 
 from tapenade.preprocessing._labels_masking import (
     _remove_labels_outside_of_mask,
@@ -133,13 +134,14 @@ def remove_small_objects(segmentation: np.ndarray, min_size: int):
     The modified segmentation array.
     """
     seg_filt = np.copy(segmentation)
-    unique_labels, label_counts = np.unique(segmentation, return_counts=True)
 
-    smallest_labels = unique_labels[np.argsort(label_counts)]
-    smallest_volumes = np.sort(label_counts)
+    props = regionprops(seg_filt)
 
-    for label, volume in zip(smallest_labels, smallest_volumes):
-        if volume<min_size :
-            seg_filt[segmentation==label]=0
-
-    return(seg_filt)
+    for prop in props:
+        if prop.area < min_size:
+            prop_slice = prop.slice
+            roi = seg_filt[prop_slice]
+            roi[prop.image] = 0
+            seg_filt[prop_slice] = roi
+    
+    return seg_filt
