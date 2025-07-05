@@ -75,8 +75,3 @@ exclude = [
 target-version = "py310"
 fix = true
 
-[tool.setuptools.package-data]
-"tapenade.notebooks" = [
-    "*.ipynb",
-    "demo_data/.keep",
-]
