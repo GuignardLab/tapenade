@@ -39,7 +39,7 @@ The pipeline is composed of the following methods:
 5. **Spatial correlation analysis**: Computes a spatial correlation map between two continuous fields.
 6. **Deformation tensors analysis**: Computes deformation tensors (inertia, true strain, etc.) from segmented objects.
 
-All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
+All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](src/tapenade/notebooks/) folder.
 
 
 ## Installation
