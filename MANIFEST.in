@@ -1,5 +1,7 @@
 include LICENSE
 include README.md
+recursive-include src/tapenade/notebooks *.ipynb
+recursive-include src/tapenade/notebooks/demo_data .keep
 
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]

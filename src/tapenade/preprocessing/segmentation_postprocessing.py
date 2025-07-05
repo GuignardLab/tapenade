@@ -92,7 +92,6 @@ def find_seg_errors(segmentation: np.ndarray, image: np.ndarray):
 
     return intensity_distribution
 
-
 def tresh_distribution(
     intensity_distribution: np.ndarray,
     threshold: float,

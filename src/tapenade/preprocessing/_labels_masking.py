@@ -31,5 +31,6 @@ def _remove_labels_outside_of_mask(
             if volume_inside < prop.area:
                 labels_roi = labels[prop.slice]
                 labels_roi[labels_roi == prop.index] = 0
+                labels[prop.slice] = labels_roi
 
     return labels

@@ -86,3 +86,6 @@ venv/
 
 #tests alice
 alice_notebooks/
+
+*.tif
+*.npy
