@@ -18,38 +18,49 @@ def _is_effectively_empty(path: Path, sentinels: Iterable[str]) -> bool:
         return True
 
 
-def get_path_to_data() -> Path:
+def get_path_to_demo_folder() -> Path:
     """
     Ensure `tapenade/notebooks/demo_data` contains data; download if still empty.
     Returns
     -------
-    pathlib.Path pointing to the data directory (guaranteed to exist).
+    pathlib.Path pointing to the demo directory (guaranteed to exist).
     """
-    package = "tapenade.notebooks"
-    subfolder = "demo_data"
-    url = "https://example.com/demo.zip"
+    package = "tapenade"
+    subfolder = "notebooks/demo_data"
+    url = "https://zenodo.org/records/15815474/files/demo_data.zip?download=1"
     sentinels = _SENTINELS
     # ── locate a *writable* directory ────────────────────────────────
     try:
         base = resources.files(package)         # works for wheels *and* -e installs
         data_dir = base / subfolder
-        data_dir.mkdir(parents=True, exist_ok=True)
     except (ModuleNotFoundError, FileNotFoundError):
-        tmp_root = Path(tempfile.gettempdir()) / f"{package.replace('.', '_')}_data"
+        tmp_root = Path(tempfile.gettempdir()) / f"{package}_data"
         tmp_root.mkdir(exist_ok=True)
         data_dir = tmp_root
 
     # ── download if still empty ──────────────────────────────────────
     if _is_effectively_empty(data_dir, sentinels):
         print(f"🔽 First run – downloading data into {data_dir} …")
-        tmp = data_dir / "payload"
+        tmp = data_dir / "payload.zip"
+        
         urllib.request.urlretrieve(url, tmp)     # <- simple, std-lib only
-        try:
-            shutil.unpack_archive(tmp, data_dir)
-            tmp.unlink()                         # remove archive after unpack
-        except shutil.ReadError:
-            # Not an archive (e.g. CSV) – just leave it where it is
-            pass
+
+        shutil.unpack_archive(tmp, data_dir)
+        tmp.unlink()                         # remove archive after unpack
+
+        nested = data_dir / "demo_data"
+        if nested.is_dir():
+            for child in nested.iterdir():
+                dest = data_dir / child.name   # move up one level
+                if dest.exists():
+                    # overwrite files or merge dirs if they already exist
+                    if dest.is_dir() and child.is_dir():
+                        shutil.rmtree(dest)
+                    else:
+                        dest.unlink()
+                child.rename(dest)
+            nested.rmdir()                     # remove the now-empty wrapper
+
         print("✅ Data ready")
     else:
         print(f"✅ Using existing data in {data_dir}")
