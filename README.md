@@ -39,7 +39,7 @@ The pipeline is composed of the following methods:
 5. **Spatial correlation analysis**: Computes a spatial correlation map between two continuous fields.
 6. **Deformation tensors analysis**: Computes deformation tensors (inertia, true strain, etc.) from segmented objects.
 
-All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
+All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](src/tapenade/notebooks/) folder.
 
 
 ## Installation
@@ -101,15 +101,15 @@ Though not mandatory, we also recommend running the inference with StarDist3D on
 
 The methods described above are available at the following locations:
 
-1. **Spectral filtering**: [Notebook](notebooks/spectral_filtering_notebook.ipynb)
-2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](notebooks/registration_notebook.ipynb)
-3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](notebooks/preprocessing_notebook.ipynb)
-4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](notebooks/segmentation_notebook.ipynb)
-4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](notebooks/masked_gaussian_smoothing_notebook.ipynb)
-5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](notebooks/spatial_correlation_analysis_notebook.ipynb)
-6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](notebooks/deformation_analysis_notebook.ipynb)
+1. **Spectral filtering**: [Notebook](src/tapenade/notebooks/spectral_filtering_notebook.ipynb)
+2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](src/tapenade/notebooks/registration_notebook.ipynb)
+3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](src/tapenade/notebooks/preprocessing_notebook.ipynb)
+4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](src/tapenade/notebooks/segmentation_notebook.ipynb)
+4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](src/tapenade/notebooks/masked_gaussian_smoothing_notebook.ipynb)
+5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](src/tapenade/notebooks/spatial_correlation_analysis_notebook.ipynb)
+6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](src/tapenade/notebooks/deformation_analysis_notebook.ipynb)
 
-All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
+All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](src/tapenade/notebooks/) folder.
 
 ## Complementary Napari plugins (for graphical user interfaces)
 

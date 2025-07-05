@@ -24,7 +24,6 @@ def extract_positions(path_positions: str):
     path_positions : str
         path to the xml file
     """
-    print(path_positions)
     positions = minidom.parse(
         str(path_positions)
     )  # need to convert the path to a string, otherwise minidom does not work for Windows paths
@@ -140,14 +139,14 @@ def create_folders(
         folder_sample = Path(folder_experiment) / filename_ref
 
         # creates paths for the output files
-        os.mkdir(os.path.join(folder_experiment, filename_ref))
-        os.mkdir(os.path.join(folder_sample, "trsf"))
-        os.mkdir(os.path.join(folder_sample, "raw"))
-        os.mkdir(os.path.join(folder_sample, "registered"))
-        os.mkdir(os.path.join(folder_sample, "fused"))
-        os.mkdir(os.path.join(folder_sample, "weights"))
-        os.mkdir(os.path.join(Path(folder_sample) / "weights", "before_trsf"))
-        os.mkdir(os.path.join(Path(folder_sample) / "weights", "after_trsf"))
+        Path(f"{folder_experiment}/{filename_ref}").mkdir(exist_ok=True)
+        Path(folder_sample / "registered").mkdir(exist_ok=True)
+        Path(folder_sample / "trsf").mkdir(exist_ok=True)
+        Path(folder_sample / "raw").mkdir(exist_ok=True)
+        Path(folder_sample / "fused").mkdir(exist_ok=True)
+        Path(folder_sample / "weights").mkdir(exist_ok=True)
+        Path(folder_sample / "weights" / "before_trsf").mkdir(exist_ok=True)
+        Path(folder_sample / "weights" / "after_trsf").mkdir(exist_ok=True)
 
         image_ref = io.imread(Path(folder_experiment) / f"{filename_ref}.tif")
         image_float = io.imread(
@@ -497,7 +496,6 @@ def register(
         "registration_depth": depth,
         "ordered_init_trsfs": ordered_init_trsfs,
     }
-    print(data)
 
     if save_json != "":
         json_string = json.dumps(data, indent=4)
@@ -662,7 +660,7 @@ def fuse_sides(
     reference_image: str,
     floating_image: str,
     folder_output: str = "",
-    name_output: str = "fusion",
+    name_output: str = 'fusion.tif',
     slope_coeff: int = 20,
     axis: int = 0,
     input_voxel: list = [1, 1, 1],
@@ -771,7 +769,6 @@ def fuse_sides(
         return fusion
     io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
 
-
 def write_hyperstacks(
     path: str,
     sample_id: str,
@@ -801,7 +798,6 @@ def write_hyperstacks(
     new_image = np.zeros((z, len(channels), y, x))
     for ch in range(len(channels)):
         one_channel = io.imread(Path(path) / f"{sample_id}_{channels[ch]}.tif")
-        print(one_channel.shape)
         new_image[:, ch, :, :] = one_channel
 
     if return_image:

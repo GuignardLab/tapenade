@@ -55,10 +55,13 @@ def _snp_threshold_binarization(
     snp_array = sigma2 * blurred
     snp_mask = snp_array > 0
 
-    snp_array = np.log(
-        snp_array, 
-        where=np.logical_and(nonzero_mask, snp_mask) if registered_image else snp_mask
-    )
+    if registered_image:
+        snp_array = np.log(
+            snp_array, 
+            where=np.logical_and(nonzero_mask, snp_mask)
+        )
+    else:
+        snp_array = np.log(snp_array, where=snp_mask)
 
     threshold = threshold_otsu(snp_array[snp_mask]) * threshold_factor
 
