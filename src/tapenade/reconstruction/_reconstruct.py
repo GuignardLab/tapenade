@@ -139,14 +139,14 @@ def create_folders(
         folder_sample = Path(folder_experiment) / filename_ref
 
         # creates paths for the output files
-        os.mkdir(os.path.join(folder_experiment, filename_ref))
-        os.mkdir(os.path.join(folder_sample, "trsf"))
-        os.mkdir(os.path.join(folder_sample, "raw"))
-        os.mkdir(os.path.join(folder_sample, "registered"))
-        os.mkdir(os.path.join(folder_sample, "fused"))
-        os.mkdir(os.path.join(folder_sample, "weights"))
-        os.mkdir(os.path.join(Path(folder_sample) / "weights", "before_trsf"))
-        os.mkdir(os.path.join(Path(folder_sample) / "weights", "after_trsf"))
+        Path(f"{folder_experiment}/{filename_ref}").mkdir(exist_ok=True)
+        Path(folder_sample / "registered").mkdir(exist_ok=True)
+        Path(folder_sample / "trsf").mkdir(exist_ok=True)
+        Path(folder_sample / "raw").mkdir(exist_ok=True)
+        Path(folder_sample / "fused").mkdir(exist_ok=True)
+        Path(folder_sample / "weights").mkdir(exist_ok=True)
+        Path(folder_sample / "weights" / "before_trsf").mkdir(exist_ok=True)
+        Path(folder_sample / "weights" / "after_trsf").mkdir(exist_ok=True)
 
         image_ref = io.imread(Path(folder_experiment) / f"{filename_ref}.tif")
         image_float = io.imread(
