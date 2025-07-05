@@ -842,8 +842,8 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
-    from stardist import gputools_available
 
+    # from stardist simport gputools_available
     # if gputools_available(): # COMMENT FOR NOW
     #     _purge_gpu_memory()
 
