@@ -809,7 +809,7 @@ def write_hyperstacks(
         imagej=True,
         compression=("zlib", 1),
     )  # float16 not compatible with Fiji
-
+    return new_image.astype(dtype)
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
     """
