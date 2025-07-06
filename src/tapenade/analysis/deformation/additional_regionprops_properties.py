@@ -200,7 +200,7 @@ def prop_true_strain_tensor(regionprops_prop, scale):
     principal_lengths = np.array(regionprops_prop.principal_lengths)
     principal_vectors = regionprops_prop.principal_vectors
 
-    denominator = np.power(np.product(principal_lengths), 1 / 3)
+    denominator = np.power(np.prod(principal_lengths), 1 / 3)
     true_strains = np.log(principal_lengths / denominator)
 
     tensor = (
