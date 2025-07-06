@@ -74,13 +74,21 @@ git clone git@github.com:GuignardLab/tapenade.git
 cd tapenade
 pip install -e .
 ```
+It is recommended to install Napari for 3D visualization after the different steps, see [installation page](https://napari.org/dev/tutorials/fundamentals/installation.html)
 
-This will install only the main library, without the libraries for the segmentation methods. To install them, please follow the instructions below. 
+```shell
+python -m pip install "napari[all]"
+```
 
-### Registration and fusion (already installed in the package)
+This will install only the main library, without the libraries for the segmentation and registration methods. To install them, please follow the instructions below. 
+
+### Registration and fusion (optional)
 
 The registration and fusion methods require the `3D-registration` Python package, see [repository](https://github.com/GuignardLab/registration-tools)
-
+```shell
+conda install vt -c morpheme
+pip install 3D-registration
+```
 ### Segmentation (optional)
 
 We provide the model `tapenade_stardist` [here](https://zenodo.org/records/14748083) (it can be downloaded independently from the other files), which we pretrained on custom annotated datasets of nuclei in gastruloids. Details are available in our [publication].
