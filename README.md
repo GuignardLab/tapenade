@@ -3,8 +3,6 @@
 [![License MIT](https://img.shields.io/pypi/l/tapenade.svg?color=green)](https://github.com/GuignardLab/tapenade/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/tapenade.svg?color=green)](https://pypi.org/project/tapenade)
 [![Python Version](https://img.shields.io/pypi/pyversions/tapenade.svg?color=green)](https://python.org)
-[![tests](https://github.com/GuignardLab/tapenade/workflows/tests/badge.svg)](https://github.com/GuignardLab/tapenade/actions)
-[![codecov](https://codecov.io/gh/GuignardLab/tapenade/branch/main/graph/badge.svg)](https://codecov.io/gh/GuignardLab/tapenade)
 
 <img src="https://github.com/GuignardLab/tapenade/blob/main/imgs/tapenade3.png" width="100">
 
@@ -41,7 +39,7 @@ The pipeline is composed of the following methods:
 5. **Spatial correlation analysis**: Computes a spatial correlation map between two continuous fields.
 6. **Deformation tensors analysis**: Computes deformation tensors (inertia, true strain, etc.) from segmented objects.
 
-All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
+All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](src/tapenade/notebooks/) folder.
 
 
 ## Installation
@@ -76,21 +74,30 @@ git clone git@github.com:GuignardLab/tapenade.git
 cd tapenade
 pip install -e .
 ```
+It is recommended to install Napari for 3D visualization after the different steps, see [installation page](https://napari.org/dev/tutorials/fundamentals/installation.html)
 
-This will install only the main library, without the libraries for the segmentation methods. To install them, please follow the instructions below. 
+```shell
+python -m pip install "napari[all]"
+```
 
-### Registration and fusion (already installed in the package)
+This will install only the main library, without the libraries for the segmentation and registration methods. To install them, please follow the instructions below. 
+
+### Registration and fusion (optional)
 
 The registration and fusion methods require the `3D-registration` Python package, see [repository](https://github.com/GuignardLab/registration-tools)
-
+```shell
+conda install vt -c morpheme
+pip install 3D-registration
+```
 ### Segmentation (optional)
 
-We provide the model `tapenade_stardist`, which we pretrained on custom annotated datasets of nuclei in gastruloids.
+We provide the model `tapenade_stardist` [here](https://zenodo.org/records/14748083) (it can be downloaded independently from the other files), which we pretrained on custom annotated datasets of nuclei in gastruloids. Details are available in our [publication].
+
 The model was trained with a fixed isotropic object size, which requires you to rescale and resize your images so that they are isotropic, and that objects have an average diameter of ~15 pixels. The images also need to be normalized (their min and max values mapped to 0 and 1 respectively).
 
 To fit these 3 constraints, we recommend using functions from our `tapenade` library (defined [here](https://github.com/GuignardLab/tapenade/blob/main/src/tapenade/preprocessing/_preprocessing.py)) via 
 1. `tapenade.preprocessing.change_array_pixelsize` for the resize/rescale step
-2. `tapenade.preprocessing.global_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
+2. `tapenade.preprocessing.local_contrast_enhancement` (or `tapenade.preprocessing.global_contrast_enhancement`) for the normalization
 
 To install Stardist3D, follow the instructions on the library's [repository](https://github.com/stardist/stardist).
 
@@ -102,28 +109,31 @@ Though not mandatory, we also recommend running the inference with StarDist3D on
 
 The methods described above are available at the following locations:
 
-1. **Spectral filtering**: [Notebook](notebooks/spectral_filtering_notebook.ipynb)
-2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](notebooks/registration_notebook.ipynb)
-3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](notebooks/preprocessing_notebook.ipynb)
-4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](notebooks/segmentation_notebook.ipynb)
-4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](notebooks/masked_gaussian_smoothing_notebook.ipynb)
-5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](notebooks/spatial_correlation_analysis_notebook.ipynb)
-6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](notebooks/deformation_analysis_notebook.ipynb)
+1. **Spectral filtering**: [Notebook](src/tapenade/notebooks/spectral_filtering_notebook.ipynb)
+2. **Registration & fusion**: [Code](src/tapenade/reconstruction/_reconstruct.py), [Notebook](src/tapenade/notebooks/registration_notebook.ipynb)
+3. **Pre-processing**: This [script](src/tapenade/preprocessing/_preprocessing.py) gathers all preprocessing functions, [Notebook](src/tapenade/notebooks/preprocessing_notebook.ipynb)
+4. **Segmentation**: [Code](src/tapenade/segmentation/_segment.py), [Notebook](src/tapenade/notebooks/segmentation_notebook.ipynb)
+4. **Masked smoothing**: [Code](src/tapenade/preprocessing/_preprocessing.py) (it is one of the preprocessing function), [Notebook](src/tapenade/notebooks/masked_gaussian_smoothing_notebook.ipynb)
+5. **Spatial correlation analysis**: [Code](src/tapenade/analysis/spatial_correlation/_spatial_correlation_plotter.py), [Notebook](src/tapenade/notebooks/spatial_correlation_analysis_notebook.ipynb)
+6. **Deformation tensors analysis**: [Code](src/tapenade/analysis/deformation/deformation_quantification.py), [Notebook](src/tapenade/notebooks/deformation_analysis_notebook.ipynb)
 
-All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](notebooks/) folder.
+All methods are explained in details in our Jupyter notebooks, which are available in the [notebooks](src/tapenade/notebooks/) folder.
 
 ## Complementary Napari plugins (for graphical user interfaces)
 
 During the pre-processing stage, dynamical exploration and interaction led to faster tuning of the parameters by allowing direct visual feedback, and gave key biophysical insight during the analysis stage. 
 We thus created three user-friendly Napari plugins designed around facilitating such interactions:
 
-1. **napari-manual-registration** (available [here](https://github.com/GuignardLab/napari-manual-registration))
+1. **napari-file2folder** (available [here](https://github.com/GuignardLab/napari-file2folder))
+This plugin allows the user to inspect (possibly large) bioimages by displaying their shape (number of elements in each dimension), and to save each element along a chosen dimension as a separate .tif file in a folder. This is useful when you have a large movie or stack of images and you want to save each frame or slice as a separate file. Optionally, the plugin allows the user to visualize the middle element of a given dimension to help the user decide which dimension to save as separate files. The plugin supports several standard bioimage file formats.
+
+2. **napari-manual-registration** (available [here](https://github.com/GuignardLab/napari-manual-registration))
 When using our automatic registration tool to spatially register two views of the same organoid, we were sometimes faced with the issue that the tool would not converge to the true registration transformation. This happens when the initial position and orientation of the floating view are too far from their target values. We thus designed a Napari plugin to quickly find a transformation that can be used to initialize our registration tool close to the optimal transformation. From two images loaded in Napari representing two views of the same organoid, the plugin allows the user to either (i) manually define a rigid transformation by continually varying 3D rotations and translations while observing the results until a satisfying fit is found, or to (ii) annotate matching salient landmarks (e.g bright dead cells or lumen-like structures) in both the reference and floating views, from which an optimal rigid transformation can be found automatically using principal component analysis. 
 
-2. **napari-tapenade-processing** (available [here](https://github.com/GuignardLab/napari-tapenade-processing))
+3. **napari-tapenade-processing** (available [here](https://github.com/GuignardLab/napari-tapenade-processing))
 From a given set of raw images, segmented object instances, and object mask, the plugin allows the user to quickly run all pre-processing functions from our main pipeline with custom parameters while being able to see and interact with the result of each step. For large datasets that are cumbersome to manipulate or cannot be loaded in Napari, the plugin provides a macro recording feature: the users can experiment and design their own pipeline on a smaller subset of the dataset, then run it on the full dataset without having to load it in Napari.
 
-2. **napari-spatial-correlation-plotter** (available [here](https://github.com/GuignardLab/napari-spatial-correlation-plotter))
+4. **napari-spatial-correlation-plotter** (available [here](https://github.com/GuignardLab/napari-spatial-correlation-plotter))
 This plugins allows the user to analyse the spatial correlations of two 3D fields loaded in Napari (e.g two fluorescent markers). The user can dynamically vary the analysis length scale, which corresponds to the standard deviation of the Gaussian kernel used for smoothing the 3D fields. 
 If a layer of segmented nuclei instances is additionally specified, the histogram is constructed by binning values at the nuclei level (each point corresponds to an individual nucleus). Otherwise, individual voxel values are used.
 The user can dynamically interact with the correlation heatmap by manually selecting a region in the plot. The corresponding cells (or voxels) that contributed to the region's statistics will be displayed in 3D on an independant Napari layer for the user to interact with and gain biological insight.
@@ -170,3 +180,5 @@ This library was generated using [Cookiecutter] and a custom made template based
 [pytest]: https://docs.pytest.org/
 [conda]: https://conda.io/projects/conda/en/latest/user-guide/install/index.html
 [file an issue]: https://github.com/GuignardLab/tapenade/issues
+
+[publication]: https://doi.org/10.1101/2024.08.13.607832

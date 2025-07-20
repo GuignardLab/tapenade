@@ -35,6 +35,7 @@ def predict_stardist(
     if normalize_input:
         perc_low, perc_high = np.percentile(data, (1, 99))
         data = (data - perc_low) / (perc_high - perc_low)
+        data = np.clip(data, 0, 1)
 
     labels = segment_stardist(data, model_path)
 

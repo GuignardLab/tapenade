@@ -842,10 +842,10 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
-    from stardist import gputools_available
 
-    if gputools_available():
-        _purge_gpu_memory()
+    # from stardist simport gputools_available
+    # if gputools_available(): # COMMENT FOR NOW
+    #     _purge_gpu_memory()
 
     return labels
 
@@ -1445,8 +1445,8 @@ def masked_gaussian_smooth_sparse(
     dim_space: int,
     sigmas: Union[float, tuple[float]],
     positions: np.ndarray = None,
-    n_job: int = -1,
-    progress_bars: bool = True,
+    n_jobs: int = -1,
+    progress_bars: bool = False,
 ):
     """
     Smooth sparse data using a gaussian kernel.
@@ -1471,7 +1471,7 @@ def masked_gaussian_smooth_sparse(
         positions of the input array.
     mask : np.ndarray, optional
         Mask to apply to the positions. If None, no mask is applied.
-    n_job : int, optional
+    n_jobs : int, optional
         Number of jobs to run in parallel. If -1, all the available CPUs are used.
         The default is -1.
 
@@ -1485,7 +1485,7 @@ def masked_gaussian_smooth_sparse(
 
     if is_temporal:
 
-        if n_job == 1:
+        if n_jobs == 1:
 
             if positions_is_temporal:
                 return np.array(
@@ -1527,7 +1527,7 @@ def masked_gaussian_smooth_sparse(
                 )
 
                 max_workers = (
-                    cpu_count() if n_job == -1 else min(n_job, cpu_count())
+                    cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
                 )
                 result = np.array(
                     process_map(
@@ -1546,7 +1546,7 @@ def masked_gaussian_smooth_sparse(
                 )
 
                 max_workers = (
-                    cpu_count() if n_job == -1 else min(n_job, cpu_count())
+                    cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
                 )
                 result = process_map(
                     func,

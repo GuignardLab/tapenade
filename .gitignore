@@ -86,3 +86,9 @@ venv/
 
 #tests alice
 alice_notebooks/
+
+*.tif
+*.npy
+
+src/tapenade/notebooks/demo_data/*
+!src/tapenade/notebooks/demo_data/.keep
