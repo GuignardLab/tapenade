@@ -142,6 +142,14 @@ def _normalize_intensity(
         array_norm[sl_norm]
     ) / np.nanmedian(array[sl])
 
+    if np.isnan(array_normalization_factor) or array_normalization_factor == 0 or np.isinf(array_normalization_factor):
+        print(
+            "Normalization factor is NaN or inf or zero. "
+            "Check whether the signals are not saturated by 0s."
+        )
+    
+        array_normalization_factor = np.nanmean(array_norm[sl_norm]) / np.nanmean(array[sl])
+
     array_norm = array_norm / array_normalization_factor
 
     return array_norm
