@@ -248,11 +248,11 @@ def process_nematic_order(
 
         s_dense = np.zeros_like(mask, dtype=np.float32)
         s_dense[mask] = s_values
-
+        return s_dense
     else:
         print("NaNs found in q_matrices")
-
-    return s_dense
+        return 0
+    
 
 def process_ellipsoidal_coeff_cellular(props,mask) :
 
