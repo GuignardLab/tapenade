@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize_scalar
+from skimage.measure import regionprops
 
 from tapenade.preprocessing._smoothing import _masked_smooth_gaussian
 
@@ -13,14 +14,19 @@ def _nans_outside_mask(array: np.ndarray, mask: np.ndarray):
 
 
 def _optimize_sigma(
-    ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray
+    ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray, aggregate_labels: bool, aggregation_func
 ):
 
     def opt_func(
         sigma, ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray
     ):
-        ref_array_smooth = _masked_smooth_gaussian(
-            ref_array, sigmas=sigma, mask_for_volume=labels_mask, mask=mask
+        ref_array_smooth = _compute_smoothed_ref_array(
+            ref_array,
+            sigma,
+            mask,
+            labels_mask,
+            aggregate_labels,
+            aggregation_func,
         )
 
         if labels_mask is not None:
@@ -49,6 +55,29 @@ def _find_reference_plane_from_medians(array: np.ndarray):
     ref_ind = np.nanargmax(np.nanmedian(array, axis=(1, 2)))
     return ref_ind
 
+def _compute_smoothed_ref_array(
+    ref_array: np.ndarray,
+    sigma: float,
+    mask: np.ndarray,
+    labels: np.ndarray,
+    aggregate_labels: bool,
+    aggregation_func,
+):
+    if aggregate_labels and labels is not None:
+        ref_array_smooth = np.empty_like(ref_array)
+        props = regionprops(labels.astype(int), intensity_image=ref_array)
+        centroids = [np.round(prop.centroid).astype(int) for prop in props]
+        ref_array_smooth[tuple(zip(*centroids))] = [
+            aggregation_func(prop.intensity_image[prop.image > 0]) for prop in props
+        ]
+        ref_array_smooth = _masked_smooth_gaussian(
+            ref_array_smooth, sigmas=sigma, mask_for_volume=ref_array_smooth.astype(bool), mask=mask
+        )
+    else:
+        ref_array_smooth = _masked_smooth_gaussian(
+            ref_array, sigmas=sigma, mask_for_volume=labels, mask=mask
+        )
+    return ref_array_smooth
 
 def _normalize_intensity(
     array: np.ndarray,
@@ -58,6 +87,8 @@ def _normalize_intensity(
     labels: np.ndarray = None,
     image_wavelength: float = None,
     width=3,
+    aggregate_labels: bool = False,
+    aggregation_func = np.nanmedian,
 ):
     """
     Normalize the intensity of an array based on a reference array assumed to have
@@ -73,6 +104,10 @@ def _normalize_intensity(
         signal is expressed, e.g nuclei. Default is None.
     - image_wavelength (float, optional): The wavelength of the image. Default is None.
     - width (int, optional): The number of neighboring planes to consider for reference plane calculation. Default is 5.
+    - aggregate_labels (bool, optional): If labels are provided and this is True, the intensity values within each label
+        will be aggregated at centroids using the specified aggregation_func before smoothing. Default is False.
+    - aggregation_func (callable, optional): The function to use for aggregating intensity values within each label if aggregate_labels is True.
+        Default is np.nanmean.
 
     Returns:
     - array_norm (ndarray): The normalized input array.
@@ -107,8 +142,14 @@ def _normalize_intensity(
     if sigma is None:
         sigma = _optimize_sigma(ref_array, mask, labels_mask)
         print("sigma = ", sigma)
-    ref_array_smooth = _masked_smooth_gaussian(
-        ref_array, sigmas=sigma, mask_for_volume=labels_mask, mask=mask
+
+    ref_array_smooth = _compute_smoothed_ref_array(
+        ref_array,
+        sigma,
+        mask,
+        labels,
+        aggregate_labels,
+        aggregation_func,
     )
 
     if mask is not None:
