@@ -120,7 +120,7 @@ def create_folders(
     folder_experiment : str
         path to the main folder
     list_ref : list
-        list of the refrence images
+        list of the reference images
     list_float : list
         list of the floating images corresponding to the reference images
     channels : list
