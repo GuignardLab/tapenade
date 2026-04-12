@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 
-def _load_model(model_path: str):
+def _load_model_stardist(model_path: str):
     """
     Load a StarDist model from a folder.
 

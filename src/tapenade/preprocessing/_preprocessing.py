@@ -22,7 +22,7 @@ from tapenade.preprocessing._local_contrast_enhancement import (
     _local_contrast_enhancement,
 )
 from tapenade.preprocessing._segmentation import (
-    _load_model,
+    _load_model_stardist,
     _purge_gpu_memory,
     _segment_stardist,
 )
@@ -830,7 +830,7 @@ def segment_stardist(
 
     is_temporal = image.ndim == 4
 
-    model = _load_model(model_path)
+    model = _load_model_stardist(model_path)
 
     if is_temporal:
         labels = np.array(
@@ -866,7 +866,7 @@ def segment_stardist_from_files(
     func_params: dict,
 ):
 
-    model = _load_model(func_params["model_path"])
+    model = _load_model_stardist(func_params["model_path"])
 
     for index, file in enumerate(image_files):
         image = tifffile.imread(file)
