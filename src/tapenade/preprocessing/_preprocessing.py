@@ -492,6 +492,7 @@ def compute_mask(
     method: str,
     sigma_blur: float,
     threshold_factor: float = 1,
+    threshold_value: float = 0.5,
     post_processing_method: str = "fill_holes",
     keep_largest_cc: bool = True,
     registered_image: bool = False,
@@ -503,11 +504,12 @@ def compute_mask(
 
     Parameters:
     - image: numpy array, input image
-    - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
-      or 'otsu' for Otsu's thresholding.
+        - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
+            'otsu' for Otsu's thresholding, or 'threshold' for a fixed threshold.
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold (default: 1)
+    - threshold_value: float, fixed threshold applied on raw image values when method is 'threshold' (default: 0.5)
     - post_processing_method: str, Can be 'convex_hull' to compute the convex hull of the mask,
       'fill_holes' to fill holes each plane separately, or 'none' to skip post-processing (default: 'fill_holes')
     - keep_largest_cc: bool, set to True to keep only the largest connected component in the mask (default: True)
@@ -526,6 +528,7 @@ def compute_mask(
             method=method,
             sigma_blur=sigma_blur,
             threshold_factor=threshold_factor,
+            threshold_value=threshold_value,
             post_processing_method=post_processing_method,
             keep_largest_cc=keep_largest_cc,
             registered_image=registered_image,
@@ -559,6 +562,7 @@ def compute_mask(
             method=method,
             sigma_blur=sigma_blur,
             threshold_factor=threshold_factor,
+            threshold_value=threshold_value,
             post_processing_method=post_processing_method,
             keep_largest_cc=keep_largest_cc,
             registered_image=registered_image,

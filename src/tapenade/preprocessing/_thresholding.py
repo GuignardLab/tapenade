@@ -98,6 +98,30 @@ def _otsu_threshold_binarization(
     return binary_mask
 
 
+def _simple_threshold_binarization(
+    image: np.ndarray, sigma_blur: float, threshold_value: float
+) -> np.ndarray:
+    """
+    Threshold image using a fixed threshold value.
+
+    Parameters:
+    - image: numpy array, input image
+    - sigma_blur: float, standard deviation of the Gaussian blur.
+    - threshold_value: float, threshold value applied directly to the (optionally
+      blurred) image.
+
+    Returns:
+    - binary_mask: numpy array, binary mask computed using a fixed threshold
+    """
+    if sigma_blur > 0:
+        blurred = gaussian_filter(image, sigma=sigma_blur)
+        binary_mask = blurred > threshold_value
+    else:
+        binary_mask = image > threshold_value
+
+    return binary_mask
+
+
 ### POST-PROCESSING FUNCTIONS
 def _get_largest_connected_component(array: np.ndarray) -> np.ndarray:
     """
@@ -224,6 +248,7 @@ def _compute_mask(
     method: str,
     sigma_blur: float,
     threshold_factor: float = 1,
+    threshold_value: float = 0.5,
     keep_largest_cc: bool = True,
     post_processing_method: str = "fill_holes",
     registered_image: bool = False,
@@ -234,11 +259,12 @@ def _compute_mask(
 
     Parameters:
     - image: numpy array, input image
-    - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
-      or 'otsu' for Otsu's thresholding.
+        - method: str, method to use for thresholding. Can be 'snp otsu' for Signal-Noise Product thresholding,
+            'otsu' for Otsu's thresholding, or 'threshold' for a fixed threshold.
     - sigma_blur: float, standard deviation of the Gaussian blur. Should typically be
       around 1/3 of the typical object diameter.
     - threshold_factor: float, factor to multiply the threshold
+    - threshold_value: float, fixed threshold applied when method is 'threshold'
     - keep_largest_cc: bool, set to True to keep only the largest connected component in the mask.
     - post_processing_method: str, method to use for post-processing the mask. Can be 'convex_hull' to compute
       the convex hull of the mask, 'fill_holes' to fill holes in each 2D slice of the mask, or 'none' to skip
@@ -250,19 +276,25 @@ def _compute_mask(
     - mask: numpy array, binary mask of the same shape as the input image
     """
 
-    # Normalize the image
-    percs = np.nanpercentile(image, [1, 99])
-    im = (image - percs[0]) / (percs[1] - percs[0])
-    im = np.clip(im, 0, 1).astype(np.float32)
-
-    # Compute the mask
     if method == "snp otsu":
+        # Normalize the image
+        percs = np.nanpercentile(image, [1, 99])
+        im = (image - percs[0]) / (percs[1] - percs[0])
+        im = np.clip(im, 0, 1).astype(np.float32)
         mask = _snp_threshold_binarization(
             im / im.max(), sigma_blur, threshold_factor, registered_image
         )
     elif method == "otsu":
+        # Normalize the image
+        percs = np.nanpercentile(image, [1, 99])
+        im = (image - percs[0]) / (percs[1] - percs[0])
+        im = np.clip(im, 0, 1).astype(np.float32)
         mask = _otsu_threshold_binarization(
             im / im.max(), sigma_blur, threshold_factor
+        )
+    elif method == "threshold":
+        mask = _simple_threshold_binarization(
+            image, sigma_blur, threshold_value
         )
     else:
         raise ValueError(f"Unknown thresholding method: {method}")
