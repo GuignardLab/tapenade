@@ -40,10 +40,10 @@ def get_path_to_demo_folder() -> Path:
 
     # ── download if still empty ──────────────────────────────────────
     if _is_effectively_empty(data_dir, sentinels):
-        print(f"🔽 First run – downloading data into {data_dir} …")
+        print(f"First run – downloading data into {data_dir} …")
         tmp = data_dir / "payload.zip"
         
-        urllib.request.urlretrieve(url, tmp)     # <- simple, std-lib only
+        urllib.request.urlretrieve(url, tmp) # retrieve archive from URL
 
         shutil.unpack_archive(tmp, data_dir)
         tmp.unlink()                         # remove archive after unpack
@@ -61,8 +61,8 @@ def get_path_to_demo_folder() -> Path:
                 child.rename(dest)
             nested.rmdir()                     # remove the now-empty wrapper
 
-        print("✅ Data ready")
+        print("Data ready")
     else:
-        print(f"✅ Using existing data in {data_dir}")
+        print(f"Using existing data in {data_dir}")
 
     return data_dir
