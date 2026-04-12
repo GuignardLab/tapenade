@@ -221,7 +221,7 @@ class SpatialCorrelationPlotter:
             Y=quantity_Y,
             percentilesY=percentiles_Y,
         )
-        
+
         bins = list(bins)
 
         if extent_X is None:

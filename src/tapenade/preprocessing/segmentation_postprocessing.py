@@ -93,6 +93,7 @@ def find_seg_errors(segmentation: np.ndarray, image: np.ndarray):
 
     return intensity_distribution
 
+
 def tresh_distribution(
     intensity_distribution: np.ndarray,
     threshold: float,
@@ -122,6 +123,7 @@ def tresh_distribution(
             id_merged_cells.append(int(intensity_distribution[index, 0]))
     return id_merged_cells
 
+
 def remove_small_objects(segmentation: np.ndarray, min_size: int):
     """
     Remove small objects from a segmentation, using the threshold volume given as a parameter.
@@ -143,5 +145,5 @@ def remove_small_objects(segmentation: np.ndarray, min_size: int):
             roi = seg_filt[prop_slice]
             roi[prop.image] = 0
             seg_filt[prop_slice] = roi
-    
+
     return seg_filt

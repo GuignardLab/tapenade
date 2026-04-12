@@ -5,7 +5,7 @@ from .additional_regionprops_properties import (
     add_ellipsoidal_coefficients,
     add_ellipsoidal_nature,
     add_ellipsoidal_nature_bool,
-    add_anisotropy_coefficient  
+    add_anisotropy_coefficient,
 )
 
 from .morphometrics import (

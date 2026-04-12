@@ -18,7 +18,9 @@ from tapenade.preprocessing._axis_alignment import (
 from tapenade.preprocessing._intensity_normalization import (
     _normalize_intensity,
 )
-from tapenade.preprocessing._local_contrast_enhancement import _local_contrast_enhancement
+from tapenade.preprocessing._local_contrast_enhancement import (
+    _local_contrast_enhancement,
+)
 from tapenade.preprocessing._segmentation import (
     _load_model,
     _purge_gpu_memory,
@@ -50,7 +52,13 @@ In typical order:
 
 
 def isotropize_and_normalize(
-    image, mask, labels, scale, sigma: float = None, pos_ref: int = 0,wavelength_dependent_normalization:bool=False
+    image,
+    mask,
+    labels,
+    scale,
+    sigma: float = None,
+    pos_ref: int = 0,
+    wavelength_dependent_normalization: bool = False,
 ):
     """
     Make an image isotropic and normalized with respect to a reference channel. Works for multichannel images (ZCYX convention) or single channel images (ZYX convention).
@@ -74,7 +82,7 @@ def isotropize_and_normalize(
     norm_image : np.array
         normalized and isotropic image
     """
-    list_wavelengths = [405, 488, 555, 647] 
+    list_wavelengths = [405, 488, 555, 647]
 
     if len(image.shape) > 3:  # if multichannel image
         nb_channels = image.shape[1]
@@ -115,7 +123,7 @@ def isotropize_and_normalize(
         norm_image = np.zeros_like(iso_image)
         for ch_float in liste_float_channels:
             channel = iso_image[:, ch_float, :, :]
-            if wavelength_dependent_normalization==False:
+            if wavelength_dependent_normalization == False:
                 channel_norm = normalize_intensity(
                     image=channel,
                     ref_image=ref_channel,
@@ -123,17 +131,17 @@ def isotropize_and_normalize(
                     labels=seg_iso,
                     sigma=sigma,
                 )
-            else :    
+            else:
                 channel_norm = normalize_intensity(
                     image=channel,
                     ref_image=ref_channel,
                     mask=mask_iso,
                     labels=seg_iso,
                     sigma=sigma,
-                    image_wavelength=list_wavelengths[ch_float]
+                    image_wavelength=list_wavelengths[ch_float],
                 )
             norm_image[:, ch_float, :, :] = channel_norm
-        if wavelength_dependent_normalization==False:
+        if wavelength_dependent_normalization == False:
             ref_norm = normalize_intensity(
                 image=ref_channel,
                 ref_image=ref_channel,
@@ -141,14 +149,14 @@ def isotropize_and_normalize(
                 labels=seg_iso,
                 sigma=sigma,
             )
-        else : 
+        else:
             ref_norm = normalize_intensity(
                 image=ref_channel,
                 ref_image=ref_channel,
                 mask=mask_iso,
                 labels=seg_iso,
                 sigma=sigma,
-                image_wavelength=list_wavelengths[pos_ref]
+                image_wavelength=list_wavelengths[pos_ref],
             )
         norm_image[:, pos_ref, :, :] = ref_norm
 
@@ -356,7 +364,7 @@ def reorganize_array_dimensions(
         list_selected_dimensions = add_suffix_if_duplicate(
             list_selected_dimensions
         )
-        (nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints) = (
+        nb_channels, nb_depth, nb_Y, nb_X, nb_timepoints = (
             list_selected_dimensions
         )
 
@@ -364,17 +372,17 @@ def reorganize_array_dimensions(
         ind_Y = str_shape.index(str(nb_Y))
         ind_X = str_shape.index(str(nb_X))
 
-        (size_T, ind_T) = (
+        size_T, ind_T = (
             (int(nb_timepoints.split("_")[0]), str_shape.index(nb_timepoints))
             if nb_timepoints is not None
             else (1, None)
         )
-        (size_C, ind_C) = (
+        size_C, ind_C = (
             (int(nb_channels.split("_")[0]), str_shape.index(nb_channels))
             if nb_channels is not None
             else (1, None)
         )
-        (size_Z, ind_Z) = (
+        size_Z, ind_Z = (
             (int(nb_depth.split("_")[0]), str_shape.index(nb_depth))
             if nb_depth is not None
             else (1, None)
@@ -464,15 +472,17 @@ def reorganize_array_dimensions_from_files(
 
     # open all array files using the multithreading library and reorganize the dimensions
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        list(tqdm(
-            executor.map(
-                multithreaded_function,
-                array_files,
-                range(len(array_files)),
-            ),
-            total=len(array_files),
-            desc="Reorganizing array",
-        ))
+        list(
+            tqdm(
+                executor.map(
+                    multithreaded_function,
+                    array_files,
+                    range(len(array_files)),
+                ),
+                total=len(array_files),
+                desc="Reorganizing array",
+            )
+        )
 
 
 def compute_mask(
@@ -842,7 +852,6 @@ def segment_stardist(
             thresholds_dict=thresholds_dict,
         )
 
-
     # from stardist simport gputools_available
     # if gputools_available(): # COMMENT FOR NOW
     #     _purge_gpu_memory()
@@ -1054,16 +1063,18 @@ def align_array_major_axis_from_files(
 
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        list(tqdm(
-            executor.map(
-                multithreaded_function,
-                array_files,
-                mask_files,
-                range(len(array_files)),
-            ),
-            total=len(array_files),
-            desc="Aligning array",
-        ))
+        list(
+            tqdm(
+                executor.map(
+                    multithreaded_function,
+                    array_files,
+                    mask_files,
+                    range(len(array_files)),
+                ),
+                total=len(array_files),
+                desc="Aligning array",
+            )
+        )
 
 
 def crop_array_using_mask(
@@ -1195,15 +1206,17 @@ def crop_array_using_mask_from_files(
     )
     # open all array files using the multithreading library and crop the results
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        list(tqdm(
-            executor.map(
-                multithreaded_function,
-                array_files,
-                range(len(array_files)),
-            ),
-            total=len(array_files),
-            desc="Cropping array",
-        ))
+        list(
+            tqdm(
+                executor.map(
+                    multithreaded_function,
+                    array_files,
+                    range(len(array_files)),
+                ),
+                total=len(array_files),
+                desc="Cropping array",
+            )
+        )
 
 
 def _parallel_gaussian_smooth(

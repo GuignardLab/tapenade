@@ -16,6 +16,7 @@ from skimage import io
 import transforms3d._gohlketransforms as tg
 from tapenade.preprocessing._preprocessing import compute_mask
 
+
 def extract_positions(path_positions: str):
     """
     Extract the X and Y positions of the objects from the xml file (saved during the acquisition) and put them in a list
@@ -51,8 +52,8 @@ def plot_positions(path_ref_positions: str, path_float_positions: str):
         path to the xml file for the floating view
 
     """
-    (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
-    (xpos_float, ypos_float) = extract_positions(path_float_positions)
+    xpos_ref, ypos_ref = extract_positions(path_ref_positions)
+    xpos_float, ypos_float = extract_positions(path_float_positions)
 
     list_number_ref = [
         i + 1 for i in range(len(xpos_ref))
@@ -88,8 +89,8 @@ def associate_positions(path_ref_positions: str, path_float_positions: str):
 
     """
 
-    (xpos_ref, ypos_ref) = extract_positions(path_ref_positions)
-    (xpos_float, ypos_float) = extract_positions(path_float_positions)
+    xpos_ref, ypos_ref = extract_positions(path_ref_positions)
+    xpos_float, ypos_float = extract_positions(path_float_positions)
     ypos_float = -ypos_float
     cost = np.zeros((len(xpos_ref), len(xpos_float)))
     for i in range(len(xpos_ref)):
@@ -152,18 +153,19 @@ def create_folders(
         # image_float = io.imread(
         #     Path(folder_experiment) / f"{filename_float}.tif"
         # )
-        image_ref = tifffile.imread(Path(folder_experiment) / f"{filename_ref}.tif")
+        image_ref = tifffile.imread(
+            Path(folder_experiment) / f"{filename_ref}.tif"
+        )
         image_float = tifffile.imread(
             Path(folder_experiment) / f"{filename_float}.tif"
         )
-
 
         if len(channels) > 1:
             for ind_ch, ch in enumerate(channels):
                 # imref = image_ref[:, :, :, ind_ch]
                 # imfloat = image_float[:, :, :, ind_ch]
-                imref=image_ref[:,ind_ch,:,:]
-                imfloat=image_float[:,ind_ch,:,:]
+                imref = image_ref[:, ind_ch, :, :]
+                imfloat = image_float[:, ind_ch, :, :]
                 io.imsave(
                     Path(folder_sample) / "raw" / f"{filename_ref}_{ch}.tif",
                     imref,  ##CAREFUL needs to be float32 or uint16 orint16 otherwise the blockmatching does not compute/save the result
@@ -408,62 +410,60 @@ def register(
     save_json: str = "",
     ordered_init_trsfs: bool = True,
 ):
-
-    # Register the two sides of the sample, using the previously computed transformation (if any) or computing a new one
-    # """
-    # Parameters
-    # ----------
-    # path_data : str
-    #     path to the raw images. In the folder structure : folder_experiment/sample_id/raw
-    # path_transformation : str
-    #     path to the folder where the transformations files are saved. In the folder structure : folder_experiment/sample_id/trsf
-    # path_registered_data : str
-    #     path where the registered images will be saved. In the folder structure : folder_experiment/sample_id/registered
-    # reference_image : str
-    #     name of the reference image, the 'fixed' one
-    # floating_image : str
-    #     name of the floating image, the one that will be registered onto the reference image
-    # input_voxel : tuple, optional
-    #     voxel size of the input image, by default [1,1,1]
-    # output_voxel : tuple, optional
-    #     voxel size of the output image, by default [1,1,1]. Can be different from the input voxel size.
-    # compute_trsf : int, optional
-    #     1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as the reference, register this channel using compute_trsf=1.
-    #     Then you can use compute_trsf=0, the algo will find the pre-existing transformation to register the other channels onto the reference channel.
-    # rot : list, optional
-    #     list of the rotations to apply to the floating image, by default [0,0,0]
-    # trans1 : list, optional
-    #     list of the translations to apply to the floating image BEFORE ROTATION, by default [0,0,0]
-    # trans2 : list, optional
-    #     list of the translations to apply to the floating image AFTER ROTATION, by default [0,0,0]
-    # other_trsf : list, optional.
-    #     list of transformations to apply to the floating image, by default [], if you want give direclty your transformations.
-    #     If this argument is not None, the value of the parameters rot, trans1, trans2 will be ignored.
-    #     You can use flipping (flip), rotations (rot), translation (trans). Specify the axis X,Y or Z after the sample_id of the transformation. For rotations and translation, precise the value (angle or distance) after the axis.
-    #     IMPORTANT : Needs 2 sets of brackets.
-    #     If order_init_trsfs is True, the transformations will be applied in the order they are given in the list init_trsfs.
-    #     # Example : [['flip', 'Z', 'trans', 'Z', -10,'trans','Y',100,'rot','X',-29,'rot','Y',41,'rot','Z',-2]]
-    # input_init_trsf_from_plugin : str, optional
-    #     path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file no matter the parameters rot, trans1, trans2 or other_trsf
-    # test_init : int, optional
-    #     1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0.
-    # trsf_type : str, optional
-    #     type of transformation to compute : rigid, affine. By default rigid.
-    # depth : int, optional
-    #     depth of the registration, by default 3
-    # bbox : int, optional
-    #     1 if the bounding box of the original image can extend, 0 if not.
-    # image_interpolation : str, optional
-    #     type of interpolation to apply to the image, by default 'linear'
-    # padding : int, optional
-    #     padding to apply to the image, by default 0
-    # save_json : str
-    #     if not None, save the parameters of that function in a json file at the path given.
-    #     IMPORTANT : saves the parameters of the function, not the parameters of the registration, in particular the initial transformations only. To save the actual transformations, use the function "compute_transformation_from_trsf_files"
-    # ordered_init_trsfs : bool, optional
-    #     if True, the transformations will be applied in the order they are given in the list init_trsfs.
-
-    # """
+    """
+    Register the two sides of the sample, using the previously computed transformation (if any) or computing a new one
+    Parameters
+    ----------
+    path_data : str
+        path to the raw images. In the folder structure : folder_experiment/sample_id/raw
+    path_transformation : str
+        path to the folder where the transformations files are saved. In the folder structure : folder_experiment/sample_id/trsf
+    path_registered_data : str
+        path where the registered images will be saved. In the folder structure : folder_experiment/sample_id/registered
+    reference_image : str
+        name of the reference image, the 'fixed' one
+    floating_image : str
+        name of the floating image, the one that will be registered onto the reference image
+    input_voxel : tuple, optional
+        voxel size of the input image, by default [1,1,1]
+    output_voxel : tuple, optional
+        voxel size of the output image, by default [1,1,1]. Can be different from the input voxel size.
+    compute_trsf : int, optional
+        1 if the transformation has to be computed, 0 if it already exists. If you have multiple channels of the same image, it is recommended to pick one expressed homogeneously as the reference, register this channel using compute_trsf=1.
+        Then you can use compute_trsf=0, the algo will find the pre-existing transformation to register the other channels onto the reference channel.
+    rot : list, optional
+        list of the rotations to apply to the floating image, by default [0,0,0]
+    trans1 : list, optional
+        list of the translations to apply to the floating image BEFORE ROTATION, by default [0,0,0]
+    trans2 : list, optional
+        list of the translations to apply to the floating image AFTER ROTATION, by default [0,0,0]
+    other_trsf : list, optional.
+        list of transformations to apply to the floating image, by default [], if you want give direclty your transformations.
+        If this argument is not None, the value of the parameters rot, trans1, trans2 will be ignored.
+        You can use flipping (flip), rotations (rot), translation (trans). Specify the axis X,Y or Z after the sample_id of the transformation. For rotations and translation, precise the value (angle or distance) after the axis.
+        IMPORTANT : Needs 2 sets of brackets.
+        If order_init_trsfs is True, the transformations will be applied in the order they are given in the list init_trsfs.
+        # Example : [['flip', 'Z', 'trans', 'Z', -10,'trans','Y',100,'rot','X',-29,'rot','Y',41,'rot','Z',-2]]
+    input_init_trsf_from_plugin : str, optional
+        path to the json file saved by the plugin, containing the transformation. If this parameter is not None, the transformation will be extracted from the json file no matter the parameters rot, trans1, trans2 or other_trsf
+    test_init : int, optional
+        1 if we apply only the initial transformation. 0 if we apply the initial trsf + blockmatching algo. By default 0.
+    trsf_type : str, optional
+        type of transformation to compute : rigid, affine. By default rigid.
+    depth : int, optional
+        depth of the registration, by default 3
+    bbox : int, optional
+        1 if the bounding box of the original image can extend, 0 if not.
+    image_interpolation : str, optional
+        type of interpolation to apply to the image, by default 'linear'
+    padding : int, optional
+        padding to apply to the image, by default 0
+    save_json : str
+        if not None, save the parameters of that function in a json file at the path given.
+        IMPORTANT : saves the parameters of the function, not the parameters of the registration, in particular the initial transformations only. To save the actual transformations, use the function "compute_transformation_from_trsf_files"
+    ordered_init_trsfs : bool, optional
+        if True, the transformations will be applied in the order they are given in the list init_trsfs.
+    """
     if rot is None:
         rot = [0, 0, 0]
     if trans1 is None:
@@ -523,7 +523,7 @@ def check_napari(
     labels: bool = False,
 ):
     """
-    Opens the registered images in napari , to check how they overlap
+    Opens the registered images in napari, to check how they overlap
 
     Parameters
     ----------
@@ -542,6 +542,7 @@ def check_napari(
 
     """
     import napari
+
     viewer = napari.Viewer()
     if isinstance(reference_image, (str | Path)):
         if os.path.exists(
@@ -668,7 +669,7 @@ def fuse_sides(
     reference_image: str,
     floating_image: str,
     folder_output: str = "",
-    name_output: str = 'fusion.tif',
+    name_output: str = "fusion.tif",
     slope_coeff: int = 20,
     axis: int = 0,
     input_voxel: list = [1, 1, 1],
@@ -707,7 +708,7 @@ def fuse_sides(
         if True, returns the fused image, by default False
     sigma_for_mask : int, optional
         sigma for the gaussian blur applied to the mask, by default 1
-    threshold_factor_for_mask : int, optional   
+    threshold_factor_for_mask : int, optional
         threshold factor for the mask
 
     """
@@ -719,8 +720,20 @@ def fuse_sides(
     dtype_input = (
         float_im.dtype
     )  # we wil return an image that has the same dtype as the input image
-    mask_r = compute_mask(image = ref_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,registered_image=False)
-    mask_f = compute_mask(image = float_im,method = 'snp otsu',sigma_blur=sigma_for_mask,threshold_factor=threshold_factor_for_mask,registered_image=False)
+    mask_r = compute_mask(
+        image=ref_im,
+        method="snp otsu",
+        sigma_blur=sigma_for_mask,
+        threshold_factor=threshold_factor_for_mask,
+        registered_image=False,
+    )
+    mask_f = compute_mask(
+        image=float_im,
+        method="snp otsu",
+        sigma_blur=sigma_for_mask,
+        threshold_factor=threshold_factor_for_mask,
+        registered_image=False,
+    )
 
     # we compute the weights as a sigmoid function of the distance to the objective (=cumulative sum of the raw image)
     cumsum_r = np.cumsum(mask_r.astype(int), axis=axis)
@@ -772,10 +785,13 @@ def fuse_sides(
     w_ref_after_trsf[sum_weights != 0] /= sum_weights[sum_weights != 0]
     w_float_after_trsf[sum_weights != 0] /= sum_weights[sum_weights != 0]
     fusion = np.round(ref_im_registered * w_ref_after_trsf).astype(np.uint16)
-    fusion += np.round(float_im_registered * w_float_after_trsf).astype(np.uint16)
+    fusion += np.round(float_im_registered * w_float_after_trsf).astype(
+        np.uint16
+    )
     if return_image:
         return fusion
     io.imsave(Path(folder_output) / name_output, fusion.astype(dtype_input))
+
 
 def write_hyperstacks(
     path: str,
@@ -802,7 +818,7 @@ def write_hyperstacks(
     image = io.imread(
         Path(path) / f"{sample_id}_{channels[0]}.tif"
     )  # reading one image just to extract the shape of the image and initialize the hyperstack
-    (z, y, x) = image.shape
+    z, y, x = image.shape
     new_image = np.zeros((z, len(channels), y, x))
     for ch in range(len(channels)):
         one_channel = io.imread(Path(path) / f"{sample_id}_{channels[ch]}.tif")
@@ -814,8 +830,9 @@ def write_hyperstacks(
     tifffile.imwrite(
         Path(path) / f"{sample_id}_registered.tif",
         new_image.astype(dtype),
-    ) 
+    )
     return new_image.astype(dtype)
+
 
 def add_centermass(landmarks, radius: int = 10, centermass_label: int = 10):
     """

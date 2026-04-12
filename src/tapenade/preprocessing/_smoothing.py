@@ -85,7 +85,7 @@ def _loop_numba(rows, cols, sparse_array_values, dists, n_points, dim_points):
     smoothed_points = np.zeros((n_points, dim_points))
     normalization_values = np.zeros((n_points, 1))
 
-    for i in range(len(rows)): # n_pairs iterations
+    for i in range(len(rows)):  # n_pairs iterations
         exp_dist = np.exp(-dists[i] ** 2 / 2)
         smoothed_points[rows[i]] += sparse_array_values[cols[i]] * exp_dist
         normalization_values[rows[i]] += exp_dist
@@ -95,7 +95,6 @@ def _loop_numba(rows, cols, sparse_array_values, dists, n_points, dim_points):
             smoothed_points[j] /= normalization_values[j]
 
     return smoothed_points, normalization_values
-
 
 
 def _masked_smooth_gaussian_sparse(
@@ -135,10 +134,12 @@ def _masked_smooth_gaussian_sparse(
     sparse_dist_matrix = new_tree.sparse_distance_matrix(
         old_tree, max_distance=3, output_type="coo_matrix"
     )
-    cols = sparse_dist_matrix.col # old indices, shape (n_pairs,)
-    rows = sparse_dist_matrix.row # new indices, shape (n_pairs,)
-    dists = sparse_dist_matrix.data # shape (n_pairs,)
-    sparse_array_values = sparse_array[:, dim_space:] # shape (n_old, dim_points)
+    cols = sparse_dist_matrix.col  # old indices, shape (n_pairs,)
+    rows = sparse_dist_matrix.row  # new indices, shape (n_pairs,)
+    dists = sparse_dist_matrix.data  # shape (n_pairs,)
+    sparse_array_values = sparse_array[
+        :, dim_space:
+    ]  # shape (n_old, dim_points)
 
     smoothed_values, norm_values = _loop_numba(
         rows, cols, sparse_array_values, dists, n_points, dim_points
@@ -150,14 +151,18 @@ def _masked_smooth_gaussian_sparse(
     if len(where_0) > 0:
         # query 10 nearest neighbors if the point has no neighbors
         k = min(10, old_positions.shape[0])
-        dists_nn, indices_nn = old_tree.query((positions/sigmas)[where_0], k=k)
+        dists_nn, indices_nn = old_tree.query(
+            (positions / sigmas)[where_0], k=k
+        )
 
-        dists_nn2_2 = dists_nn ** 2 / 2
-        
+        dists_nn2_2 = dists_nn**2 / 2
+
         exp_dists = np.exp(-dists_nn2_2).reshape(-1, k, 1)
         norm_values = np.sum(exp_dists, axis=1).reshape(-1, 1)
 
-        values_nn = sparse_array_values[indices_nn.flatten()].reshape(-1, k, dim_points)
+        values_nn = sparse_array_values[indices_nn.flatten()].reshape(
+            -1, k, dim_points
+        )
 
         smoothed_values = np.sum(values_nn * exp_dists, axis=1)
         smoothed_values /= norm_values

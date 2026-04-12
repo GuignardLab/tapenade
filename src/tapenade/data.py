@@ -7,7 +7,11 @@ from importlib import resources
 from pathlib import Path
 from typing import Iterable
 
-_SENTINELS: set[str] = {".keep", ".gitkeep", ".placeholder"}  # files that *don’t* count as data
+_SENTINELS: set[str] = {
+    ".keep",
+    ".gitkeep",
+    ".placeholder",
+}  # files that *don’t* count as data
 
 
 def _is_effectively_empty(path: Path, sentinels: Iterable[str]) -> bool:
@@ -31,7 +35,7 @@ def get_path_to_demo_folder() -> Path:
     sentinels = _SENTINELS
     # ── locate a *writable* directory ────────────────────────────────
     try:
-        base = resources.files(package)         # works for wheels *and* -e installs
+        base = resources.files(package)  # works for wheels *and* -e installs
         data_dir = base / subfolder
     except (ModuleNotFoundError, FileNotFoundError):
         tmp_root = Path(tempfile.gettempdir()) / f"{package}_data"
@@ -42,16 +46,16 @@ def get_path_to_demo_folder() -> Path:
     if _is_effectively_empty(data_dir, sentinels):
         print(f"First run – downloading data into {data_dir} …")
         tmp = data_dir / "payload.zip"
-        
-        urllib.request.urlretrieve(url, tmp) # retrieve archive from URL
+
+        urllib.request.urlretrieve(url, tmp)  # retrieve archive from URL
 
         shutil.unpack_archive(tmp, data_dir)
-        tmp.unlink()                         # remove archive after unpack
+        tmp.unlink()  # remove archive after unpack
 
         nested = data_dir / "demo_data"
         if nested.is_dir():
             for child in nested.iterdir():
-                dest = data_dir / child.name   # move up one level
+                dest = data_dir / child.name  # move up one level
                 if dest.exists():
                     # overwrite files or merge dirs if they already exist
                     if dest.is_dir() and child.is_dir():
@@ -59,7 +63,7 @@ def get_path_to_demo_folder() -> Path:
                     else:
                         dest.unlink()
                 child.rename(dest)
-            nested.rmdir()                     # remove the now-empty wrapper
+            nested.rmdir()  # remove the now-empty wrapper
 
         print("Data ready")
     else:

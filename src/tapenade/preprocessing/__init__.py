@@ -15,7 +15,7 @@ from ._preprocessing import (
     crop_array_using_mask_from_files,
     masked_gaussian_smoothing,
     masked_gaussian_smooth_dense_two_arrays_gpu,
-    masked_gaussian_smooth_sparse
+    masked_gaussian_smooth_sparse,
 )
 
 __all__ = [

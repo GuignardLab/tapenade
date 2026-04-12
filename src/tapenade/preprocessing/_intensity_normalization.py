@@ -14,7 +14,11 @@ def _nans_outside_mask(array: np.ndarray, mask: np.ndarray):
 
 
 def _optimize_sigma(
-    ref_array: np.ndarray, mask: np.ndarray, labels_mask: np.ndarray, aggregate_labels: bool, aggregation_func
+    ref_array: np.ndarray,
+    mask: np.ndarray,
+    labels_mask: np.ndarray,
+    aggregate_labels: bool,
+    aggregation_func,
 ):
 
     def opt_func(
@@ -55,6 +59,7 @@ def _find_reference_plane_from_medians(array: np.ndarray):
     ref_ind = np.nanargmax(np.nanmedian(array, axis=(1, 2)))
     return ref_ind
 
+
 def _compute_smoothed_ref_array(
     ref_array: np.ndarray,
     sigma: float,
@@ -68,16 +73,21 @@ def _compute_smoothed_ref_array(
         props = regionprops(labels.astype(int), intensity_image=ref_array)
         centroids = [np.round(prop.centroid).astype(int) for prop in props]
         ref_array_smooth[tuple(zip(*centroids))] = [
-            aggregation_func(prop.intensity_image[prop.image > 0]) for prop in props
+            aggregation_func(prop.intensity_image[prop.image > 0])
+            for prop in props
         ]
         ref_array_smooth = _masked_smooth_gaussian(
-            ref_array_smooth, sigmas=sigma, mask_for_volume=ref_array_smooth.astype(bool), mask=mask
+            ref_array_smooth,
+            sigmas=sigma,
+            mask_for_volume=ref_array_smooth.astype(bool),
+            mask=mask,
         )
     else:
         ref_array_smooth = _masked_smooth_gaussian(
             ref_array, sigmas=sigma, mask_for_volume=labels, mask=mask
         )
     return ref_array_smooth
+
 
 def _normalize_intensity(
     array: np.ndarray,
@@ -88,7 +98,7 @@ def _normalize_intensity(
     image_wavelength: float = None,
     width=3,
     aggregate_labels: bool = False,
-    aggregation_func = np.nanmedian,
+    aggregation_func=np.nanmedian,
 ):
     """
     Normalize the intensity of an array based on a reference array assumed to have
@@ -133,10 +143,10 @@ def _normalize_intensity(
             raise ValueError(
                 f"Image wavelength {image_wavelength} not supported."
             )
-        
+
         exponentiation_coeff = coeff_dict[image_wavelength]
-        
-        ref_array = ref_array ** exponentiation_coeff
+
+        ref_array = ref_array**exponentiation_coeff
 
     # compute smoothed reference array for normalization
     if sigma is None:
@@ -183,13 +193,19 @@ def _normalize_intensity(
         array_norm[sl_norm]
     ) / np.nanmedian(array[sl])
 
-    if np.isnan(array_normalization_factor) or array_normalization_factor == 0 or np.isinf(array_normalization_factor):
+    if (
+        np.isnan(array_normalization_factor)
+        or array_normalization_factor == 0
+        or np.isinf(array_normalization_factor)
+    ):
         print(
             "Normalization factor is NaN or inf or zero. "
             "Check whether the signals are not saturated by 0s."
         )
-    
-        array_normalization_factor = np.nanmean(array_norm[sl_norm]) / np.nanmean(array[sl])
+
+        array_normalization_factor = np.nanmean(
+            array_norm[sl_norm]
+        ) / np.nanmean(array[sl])
 
     array_norm = array_norm / array_normalization_factor
 

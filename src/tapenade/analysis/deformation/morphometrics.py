@@ -2,11 +2,12 @@ import numpy as np
 from skimage.measure import regionprops, label
 from scipy.ndimage import distance_transform_edt
 from skimage.morphology import binary_erosion
-from tapenade.analysis.deformation.additional_regionprops_properties import add_principal_lengths,add_ellipsoidal_coefficients
-from tapenade.preprocessing import (
-    masked_gaussian_smoothing)
+from tapenade.analysis.deformation.additional_regionprops_properties import (
+    add_principal_lengths,
+    add_ellipsoidal_coefficients,
+)
+from tapenade.preprocessing import masked_gaussian_smoothing
 from tapenade.preprocessing._smoothing import _masked_smooth_gaussian
-
 
 
 def clear_borders(labels, buffer_size=0, bgval=0, mask=None, *, out=None):
@@ -85,15 +86,13 @@ def clear_borders(labels, buffer_size=0, bgval=0, mask=None, *, out=None):
     return out
 
 
-
 def smooth_cellular_map(
     cellular,
     props,
     mask,
     sigma,
-
 ):
-    #takes a cellular map (one value per segmented nuclei) and apply a gaussian smoothing
+    # takes a cellular map (one value per segmented nuclei) and apply a gaussian smoothing
 
     centroids = np.array([prop.centroid for prop in props])
     centroids_data = np.zeros_like(mask, dtype=np.float32)
@@ -109,49 +108,46 @@ def smooth_cellular_map(
     return smoothed
 
 
-def process_genetic_field_cellular(labels,genetic_field):
-    #return cellular map (one value per segmented nuclei) of mean gene expression in that nucleus
+def process_genetic_field_cellular(labels, genetic_field):
+    # return cellular map (one value per segmented nuclei) of mean gene expression in that nucleus
     props_genetic_field = regionprops(labels, intensity_image=genetic_field)
     cellular_genetic_field = np.zeros_like(labels, dtype=np.float32)
     for prop in props_genetic_field:
         cellular_genetic_field[prop.slice][prop.image] = prop.mean_intensity
     return cellular_genetic_field
 
-def process_radial_distance_cellular(
-    mask, labels
-):
-    #return cellular map (one value per segmented nuclei) of radial distance to the tissue surface in 3D
+
+def process_radial_distance_cellular(mask, labels):
+    # return cellular map (one value per segmented nuclei) of radial distance to the tissue surface in 3D
     radial_distance_cellular = np.zeros_like(mask, dtype=np.float32)
     distance_transform = np.zeros_like(mask, dtype=np.float32)
     props = regionprops(labels)
     for z in range(len(mask)):
-        distance_transform[z] = distance_transform_edt(
-            mask[z].astype(bool))
-        
-    for prop in props: 
+        distance_transform[z] = distance_transform_edt(mask[z].astype(bool))
+
+    for prop in props:
         dist = distance_transform[tuple(np.array(prop.centroid).astype(int))]
         radial_distance_cellular[prop.slice][prop.image] = dist
     return radial_distance_cellular
 
-def process_axial_distance_cellular(
-    mask, labels
-):
-    #return cellular map (one value per segmented nuclei) of axial distance along z to the first plane in 3D
+
+def process_axial_distance_cellular(mask, labels):
+    # return cellular map (one value per segmented nuclei) of axial distance along z to the first plane in 3D
     axial_distance_cellular = np.zeros_like(mask, dtype=np.float32)
 
     props = regionprops(labels)
     first_x = np.min([prop.centroid[2] for prop in props])
-    for prop in props: 
-        dist = prop.centroid[2]-first_x
+    for prop in props:
+        dist = prop.centroid[2] - first_x
         axial_distance_cellular[prop.slice][prop.image] = dist
 
     return axial_distance_cellular
+
 
 def process_cell_density_sigma(
     props,
     mask,
     sigma,
-    
 ):
     centroids = np.array([prop.centroid for prop in props])
     centroids_data = np.zeros_like(mask, dtype=np.float32)
@@ -165,6 +161,7 @@ def process_cell_density_sigma(
     )
     return density
 
+
 def process_density_gradient(
     mask,
     density,
@@ -176,7 +173,6 @@ def process_density_gradient(
 
     gradient_magnitude_field = np.linalg.norm(gradient_field, axis=-1)
 
-        
     gradient_on_grid = gradient_field[tuple(positions_on_grid.T.astype(int))]
 
     napari_gradient_on_grid = np.zeros((len(positions_on_grid), 2, 3))
@@ -186,8 +182,14 @@ def process_density_gradient(
 
     angles = np.arctan2(*(napari_gradient_on_grid[:, 1, -2:].reshape(-1, 2).T))
     angles = np.arctan2(np.sin(angles - 1), np.cos(angles - 1))
-    #gradient_field can be used to compute dot product between cell density gradient and true strain tensor
-    return gradient_field, gradient_magnitude_field,napari_gradient_on_grid, angles
+    # gradient_field can be used to compute dot product between cell density gradient and true strain tensor
+    return (
+        gradient_field,
+        gradient_magnitude_field,
+        napari_gradient_on_grid,
+        angles,
+    )
+
 
 def process_volume_fraction_sigma(
     mask,
@@ -200,21 +202,21 @@ def process_volume_fraction_sigma(
     )
     return volume_fraction
 
+
 def process_nuclear_volume_cellular(
     props,
     mask,
 ):
     centroids_data_volumes = np.zeros_like(mask, dtype=np.float32)
 
-    for prop in props: 
+    for prop in props:
         centroids_data_volumes[prop.slice][prop.image] = prop.area
 
     return centroids_data_volumes
 
-def process_nematic_order(
-    mask, labels, sigma
-):
-    props =regionprops(labels)
+
+def process_nematic_order(mask, labels, sigma):
+    props = regionprops(labels)
     n_points = len(props)
     n_dim_tensor = 9
 
@@ -223,11 +225,15 @@ def process_nematic_order(
     dense_centroids = np.zeros(mask.shape)
 
     for index_label, prop in enumerate(props):
-        add_principal_lengths(prop, add_principal_vectors=True, scale=(1, 1, 1))
+        add_principal_lengths(
+            prop, add_principal_vectors=True, scale=(1, 1, 1)
+        )
         orientation_vector = prop.principal_vectors[0]
         m = np.outer(orientation_vector, orientation_vector)
         sparse_m_tensor[index_label, :] = m.flatten()
-        dense_m_tensor[tuple(np.array(prop.centroid).astype(int))] = m.flatten()
+        dense_m_tensor[tuple(np.array(prop.centroid).astype(int))] = (
+            m.flatten()
+        )
         dense_centroids[tuple(np.array(prop.centroid).astype(int))] = 1
 
     smoothed_dense_m_tensor = np.zeros_like(dense_m_tensor)
@@ -252,34 +258,38 @@ def process_nematic_order(
     else:
         print("NaNs found in q_matrices")
         return 0
-    
 
-def process_ellipsoidal_coeff_cellular(props,mask) :
+
+def process_ellipsoidal_coeff_cellular(props, mask):
 
     ellipsoidal_coefficients = np.zeros_like(mask, dtype=np.float32)
     for prop in props:
         if not hasattr(prop, "ellipsoidal_coefficients"):
-            prop = add_ellipsoidal_coefficients(prop, scale=(1,1,1))
+            prop = add_ellipsoidal_coefficients(prop, scale=(1, 1, 1))
         l1, l2, l3 = prop.principal_lengths
         score = np.log(l2**2 / (l1 * l3))
         ellipsoidal_coefficients[prop.slice][prop.image] = score
     return ellipsoidal_coefficients
 
-def process_oblate_prolate_cellular(props,mask) :
+
+def process_oblate_prolate_cellular(props, mask):
 
     ellipsoidal_coefficients_oblate = np.zeros_like(mask, dtype=np.float32)
     ellipsoidal_coefficients_prolate = np.zeros_like(mask, dtype=np.float32)
     for prop in props:
         if not hasattr(prop, "ellipsoidal_coefficients"):
-            prop = add_ellipsoidal_coefficients(prop, scale=(1,1,1))
+            prop = add_ellipsoidal_coefficients(prop, scale=(1, 1, 1))
         l1, l2, l3 = prop.principal_lengths
-        ellipsoidal_coefficients_oblate[prop.slice][prop.image] = (l2-l3) / np.sqrt(l1 * l3)
-        ellipsoidal_coefficients_prolate[prop.slice][prop.image] = (l1-l2) / np.sqrt(l1 * l3)
+        ellipsoidal_coefficients_oblate[prop.slice][prop.image] = (
+            l2 - l3
+        ) / np.sqrt(l1 * l3)
+        ellipsoidal_coefficients_prolate[prop.slice][prop.image] = (
+            l1 - l2
+        ) / np.sqrt(l1 * l3)
     return ellipsoidal_coefficients_oblate, ellipsoidal_coefficients_prolate
 
-def process_true_strain_maxeig_cellular(
-    props,mask
-):
+
+def process_true_strain_maxeig_cellular(props, mask):
     # Maximum eigenvalue of the true strain tensor of each nuclei, cellular map (one value per segmented nuclei)
 
     true_strain_maxeig_cellular = np.zeros_like(mask, dtype=np.float32)
@@ -293,4 +303,3 @@ def process_true_strain_maxeig_cellular(
         true_strain_maxeig_cellular[prop.slice][prop.image] = max_eig
 
     return true_strain_maxeig_cellular
- 
