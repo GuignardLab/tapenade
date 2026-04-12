@@ -1,6 +1,10 @@
 import numpy as np
 from skimage.transform import resize
-from tapenade.preprocessing import change_array_pixelsize, segment_stardist
+from tapenade.preprocessing import (
+    change_array_pixelsize,
+    segment_cellpose_sam,
+    segment_stardist,
+)
 
 
 def predict_stardist(
@@ -48,3 +52,33 @@ def predict_stardist(
     )
 
     return aniso_labels.astype(np.int16)
+
+
+def predict_cellpose_sam(
+    array: np.ndarray,
+    diameter: float | None = None,
+    normalize_input: bool = True,
+):
+    """
+    Predict the segmentation of an array using CellPose-SAM.
+
+    Parameters:
+    - array: a 3D numpy array, input image to segment
+    - diameter: float, estimated object diameter (pixels). None for auto.
+    - normalize_input: bool, whether to normalize the input image
+
+    Returns:
+    - labels: numpy array
+    """
+    assert len(np.shape(array)) <= 3
+
+    data = array
+
+    if normalize_input:
+        perc_low, perc_high = np.percentile(data, (1, 99))
+        data = (data - perc_low) / (perc_high - perc_low)
+        data = np.clip(data, 0, 1)
+
+    labels = segment_cellpose_sam(data, diameter=diameter)
+
+    return labels.astype(np.int16)

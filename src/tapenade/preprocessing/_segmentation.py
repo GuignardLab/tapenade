@@ -68,3 +68,56 @@ def _purge_gpu_memory():
 
     cuda.select_device(0)
     cuda.close()
+
+
+def _load_model_cellpose_sam(gpu: bool = True):
+    """
+    Load a CellPose-SAM model.
+
+    Parameters:
+    - gpu: bool, whether to request GPU usage
+    """
+
+    try:
+        from cellpose import models, core
+
+        if gpu and not core.use_gpu():
+            warnings.warn("No GPU access detected; falling back to CPU.")
+            gpu = False
+
+        model = models.CellposeModel(gpu=gpu)
+        return model
+    except ImportError:
+        warnings.warn("Please install cellpose for your system")
+        raise ImportError("Please install cellpose for your system")
+
+
+def _segment_cellpose_sam(
+    image: np.ndarray,
+    model,
+    diameter: float | None = None,
+    batch_size: int = 32,
+    flow3D_smooth: int = 1,
+):
+    """
+    Predict the segmentation of an array using CellPose-SAM.
+
+    Parameters:
+    - image: a 3D numpy array, input image to segment
+    - model: CellPose model object
+    - diameter: float, estimated object diameter (pixels). None for auto.
+    - batch_size: int, batch size for inference
+    - flow3D_smooth: int, flow smoothing for 3D
+    """
+
+    labels, _, _ = model.eval(
+        image,
+        z_axis=0,
+        channel_axis=None,
+        batch_size=batch_size,
+        do_3D=True,
+        flow3D_smooth=flow3D_smooth,
+        diameter=diameter,
+    )
+
+    return labels.astype(np.uint16)

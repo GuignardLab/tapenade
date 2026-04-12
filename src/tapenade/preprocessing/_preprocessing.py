@@ -22,8 +22,10 @@ from tapenade.preprocessing._local_contrast_enhancement import (
     _local_contrast_enhancement,
 )
 from tapenade.preprocessing._segmentation import (
+    _load_model_cellpose_sam,
     _load_model_stardist,
     _purge_gpu_memory,
+    _segment_cellpose_sam,
     _segment_stardist,
 )
 from tapenade.preprocessing._smoothing import (
@@ -883,6 +885,79 @@ def segment_stardist_from_files(
 
     if gputools_available():
         _purge_gpu_memory()
+
+
+def segment_cellpose_sam(
+    image: np.ndarray,
+    diameter: float | None = None,
+    batch_size: int = 32,
+    flow3D_smooth: int = 1,
+    gpu: bool = True,
+    n_jobs: int = -1,
+) -> np.ndarray:
+    """
+    Predict the segmentation of an array using CellPose-SAM.
+
+    Parameters:
+    - image: a 3D numpy array, input image to segment
+    - diameter: float, estimated object diameter (pixels). None for auto.
+    - batch_size: int, batch size for inference
+    - flow3D_smooth: int, flow smoothing for 3D
+    - gpu: bool, request GPU usage
+    - n_jobs: int, not used here but kept for consistency with other functions
+    """
+
+    is_temporal = image.ndim == 4
+
+    model = _load_model_cellpose_sam(gpu=gpu)
+
+    if is_temporal:
+        labels = np.array(
+            [
+                _segment_cellpose_sam(
+                    im,
+                    model=model,
+                    diameter=diameter,
+                    batch_size=batch_size,
+                    flow3D_smooth=flow3D_smooth,
+                )
+                for im in tqdm(image, desc="Predicting with CellPose-SAM")
+            ],
+            dtype=np.uint16,
+        )
+    else:
+        labels = _segment_cellpose_sam(
+            image,
+            model=model,
+            diameter=diameter,
+            batch_size=batch_size,
+            flow3D_smooth=flow3D_smooth,
+        )
+
+    return labels
+
+
+def segment_cellpose_sam_from_files(
+    image_files: list[str],
+    path_to_save: str,
+    compress_params: dict,
+    func_params: dict,
+):
+
+    model = _load_model_cellpose_sam(gpu=func_params.get("gpu", True))
+
+    for index, file in enumerate(image_files):
+        image = tifffile.imread(file)
+        labels = _segment_cellpose_sam(
+            image,
+            model=model,
+            diameter=func_params.get("diameter"),
+            batch_size=func_params.get("batch_size", 32),
+            flow3D_smooth=func_params.get("flow3D_smooth", 1),
+        )
+        tifffile.imwrite(
+            f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
+        )
 
 
 def align_array_major_axis(
