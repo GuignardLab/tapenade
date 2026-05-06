@@ -882,7 +882,7 @@ def segment_stardist_from_files(
             thresholds_dict=func_params.get("thresholds_dict"),
         )
         tifffile.imwrite(
-            f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
+            f"{path_to_save}/segmented_{index:>04}.tif", labels, **compress_params
         )
 
     from stardist import gputools_available
@@ -960,7 +960,7 @@ def segment_cellpose_sam_from_files(
             flow3D_smooth=func_params.get("flow3D_smooth", 1),
         )
         tifffile.imwrite(
-            f"{path_to_save}/segmented_{index:>04}", labels, **compress_params
+            f"{path_to_save}/segmented_{index:>04}.tif", labels, **compress_params
         )
 
 
