@@ -46,14 +46,16 @@ All methods are explained in details in our Jupyter notebooks, which are availab
 
 ### Main library
 
-We recommand to install the library in a specific environement (like [conda]). To create a new environement, you can run the following command:
+We recommend installing the library in a specific environment (like [conda]).
+Compatible with Python 3.9 to 3.13 (recommended: 3.12).
+To create a new environment, you can run the following command:
 
-    conda create -n env-tapenade python=3.10
-You can then activate the environement with:
+    conda create -n env-tapenade python=3.12
+You can then activate the environment with:
 
     conda activate env-tapenade
 
-For here onward, it is assumed that you are running the commands from the `env-tapenade` [conda] environement.
+For here onward, it is assumed that you are running the commands from the `env-tapenade` [conda] environment.
 
 You can install `tapenade` via [pip]:
 
