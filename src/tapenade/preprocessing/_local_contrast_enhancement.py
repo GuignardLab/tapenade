@@ -40,7 +40,8 @@ def _local_contrast_enhancement(
     # Compute necessary variables
     array_shape = image.shape
     box_length = 2 * box_size + 1
-    grid_shape = [int(np.ceil(s / box_length)) + 1 for s in array_shape]
+    
+    grid_shape = [int(np.ceil(s / box_length)) + 1 if s > 1 else 1 for s in array_shape]
     grid_positions = [
         np.linspace(0, s - 1, n_boxes)
         for s, n_boxes in zip(array_shape, grid_shape, strict=False)
@@ -59,15 +60,21 @@ def _local_contrast_enhancement(
 
         slices = []
         for index, s in zip(indices_grid, array_shape, strict=False):
-            start = min(max(index - box_size, 0), s - box_length)
-            stop = min(max(index + box_size + 1, box_length), s)
+            if s <= box_length:
+                slices.append(slice(0, s))
+                continue
+
+            start = index - box_size
+            start = max(0, min(start, s - box_length))
+            stop = start + box_length
+
             slices.append(slice(start, stop))
 
         box = image[tuple(slices)].copy()
 
         # for debug, actually should not be necessary
-        if box.size < 0.2 * box_length**image.ndim:
-            continue
+        # if box.size < 0.2 * box_length**image.ndim:
+        #     continue
 
         if mask is not None:
             box = box[mask[tuple(slices)]]
