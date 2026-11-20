@@ -8,6 +8,8 @@
 
 A fully-visual pipeline for quantitative analysis of 3D organoid images acquired with deep imaging microscopy.
 
+**We provide a comprehensive and user-friendly protocol on how to use [the pipeline](#overview) and the associated [Napari plugins](#complementary-napari-plugins-for-graphical-user-interfaces) in [this publication](https://bio-protocol.org/en/bpdetail?id=5823&type=0).** 
+
 If you use this plugin for your research, please [cite us](https://github.com/GuignardLab/tapenade/blob/main/README.md#how-to-cite).
 
 ----------------------------------
@@ -142,9 +144,11 @@ The user can dynamically interact with the correlation heatmap by manually selec
 
 ## How to cite
 
-If you use this plugin for your research, please cite us using the following reference:
+If you use this plugin for your research, please cite us using the following references:
 
-- Jules Vanaret, Alice Gros, Valentin Dunsing-Eichenauer, Agathe Rostan, Philippe Roudot, Pierre-François Lenne, Léo Guignard, Sham Tlili (2025) <b>A quantitative pipeline for whole-mount deep imaging and analysis of multi-layered organoids across scales</b>. eLife 14:RP107154 ; doi:https://doi.org/10.7554/eLife.107154.2
+- Gros, A., Vanaret, J., Tlili, S., & Guignard, L. (2026). Tapenade: Spatial Quantification of Mechanical and Genetic Fields in Dense 3D Organoids From Cell to Tissue Scale. Bio-protocol, 16(19). DOI: 10.21769/BioProtoc.5823.
+
+- Gros, A., Vanaret, J., Dunsing-Eichenauer, V., Rostan, A., Roudot, P., Lenne, P. F., ... & Tlili, S. (2026). A quantitative pipeline for whole-mount deep imaging and analysis of multi-layered organoids across scales. Elife, 14, RP107154. DOI: https://doi.org/10.7554/eLife.107154.2
 
 
 This repository has been developed by (in alphabetical order):
